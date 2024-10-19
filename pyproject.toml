@@ -1,0 +1,43 @@
+[project]
+name = "agents-framework"
+requires-python = ">=3.11"
+readme = "README.md"
+version = "0.0.0"
+authors = [
+    {name = "Karol Wójciak", email = "karolwojciak@student.agh.edu.pl"},
+    {name = "Łukasz Zawadzki", email = "lzawadzki@student.agh.edu.pl"},
+]
+dependencies = [
+    "fastapi==0.115.2",
+    "python-dotenv==1.0.1",
+    "sqlmodel==0.0.22",
+    "SQLAlchemy==2.0.36",
+    "asyncpg==0.29.0",
+    "pydantic==2.9.2",
+    "python-socketio==5.11.4",
+    "uvicorn==0.32.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff==0.7.0",
+    "pre-commit==4.0.1"
+]
+
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+ignore = [
+    "B008",  # do not perform function calls in argument defaults
+    "B904",  # allow raising exceptions without from e
+]
