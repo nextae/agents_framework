@@ -1,5 +1,15 @@
 # Agents Framework
 
+### Development
+1. Install the dev dependencies
+    ```bash
+    pip install .[dev]
+    ```
+2. Setup pre-commit
+    ```bash
+    pre-commit install
+    ```
+
 ### Running the Application
 
 #### Locally:
