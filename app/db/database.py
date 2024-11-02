@@ -10,7 +10,7 @@ DATABASE_URL = (
     f"postgresql://"
     f"{getenv('POSTGRES_USER')}:"
     f"{getenv('POSTGRES_PASSWORD')}"
-    f"@localhost:5432/{getenv('POSTGRES_DB')}"
+    f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
 )  # TODO check if local or docker?
 engine = create_engine(DATABASE_URL)
 
