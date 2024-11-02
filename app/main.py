@@ -4,7 +4,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from socketio import ASGIApp
 
 from app.api.main import api_router
-from app.db.database import create_db_and_tables, wait_for_db
 from app.sockets.main import sio
 
 load_dotenv()
@@ -18,12 +17,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def on_startup():
-    wait_for_db()
-    create_db_and_tables()
 
 
 @app.get("/")
