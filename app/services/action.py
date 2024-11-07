@@ -12,15 +12,7 @@ class ActionService:
 
     @staticmethod
     async def get_action(action_id: int, db: Session) -> Action | None:
-        stmt = select(Action).where(Action.id == action_id)
-        result = db.exec(stmt).fetchall()
-        if len(result) == 0:
-            return None
-        if len(result) == 1:
-            return result[0]
-        raise Exception(
-            f"Found more than one action with id {action_id}. This shouldn't happen"
-        )
+        return db.get(Action, action_id)
 
     @staticmethod
     async def create_action(action: Action, db: Session):

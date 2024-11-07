@@ -12,15 +12,7 @@ class AgentService:
 
     @staticmethod
     async def get_agent(agent_id: int, db: Session) -> Agent | None:
-        stmt = select(Agent).where(Agent.id == agent_id)
-        result = db.exec(stmt).fetchall()
-        if len(result) == 0:
-            return None
-        if len(result) == 1:
-            return result[0]
-        raise Exception(
-            f"Found more than one agent with id {agent_id}. This shouldn't happen"
-        )
+        return db.get(Agent, agent_id)
 
     @staticmethod
     async def create_agent(agent: Agent, db: Session):
