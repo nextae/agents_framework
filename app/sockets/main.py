@@ -47,7 +47,7 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
         ),
         Action(
             name="run_away",
-            description="Run away from the player.",
+            description="Do not run away unless you are in danger or the player knows the secret password.",  # noqa: E501
             args=[],
         ),
     ]
@@ -55,10 +55,6 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
     chain = create_chain(background, actions)
 
     llm_response = await chain.ainvoke({"query": request.query})
-    response = AgentQueryResponse(
-        agent_id=request.agent_id,
-        response=llm_response.content,
-        actions=llm_response.tool_calls,
-    )
 
+    response = AgentQueryResponse.from_llm_response(request.agent_id, llm_response)
     return response.model_dump()
