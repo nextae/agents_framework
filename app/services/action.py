@@ -50,9 +50,7 @@ class ActionService:
     async def update_action(
         action_id: int, updated: Action, db: AsyncSession
     ) -> Action | None:
-        stmt = select(Action).where(Action.id == action_id)
-
-        existing_action = (await db.exec(stmt)).first()
+        existing_action = await ActionService.get_action_by_id(action_id, db)
 
         if not existing_action:
             raise ValueError(f"Action with id={action_id} not found")
@@ -67,7 +65,7 @@ class ActionService:
 
     @staticmethod
     async def delete_action(action_id: int, db: AsyncSession) -> int | None:
-        action = await db.get(Action, action_id)
+        action = await ActionService.get_action_by_id(action_id, db)
 
         if not action:
             raise ValueError(f"Action with id={action_id} not found")
