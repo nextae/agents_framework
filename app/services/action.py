@@ -4,6 +4,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.action import Action
 from app.models.action_param import ActionParam
+from app.models.agents_actions_matches import AgentsActionsMatches
 
 
 class ActionService:
@@ -17,7 +18,7 @@ class ActionService:
     @staticmethod
     async def create_action_with_params(
         action: Action, params: list[ActionParam], db: AsyncSession
-    ) -> tuple[Action | None, list[ActionParam]]:
+    ) -> Action:
         db.add(action)
         await db.commit()
         await db.refresh(action)
@@ -27,28 +28,22 @@ class ActionService:
             db.add(param)
 
         await db.commit()
-        return action, params  # Actually returns [], [].
-        # To get the objects I think we'd have to re-select them from db,
-        # which is not ideal, but it does add them into the db tho
+        return action
 
     @staticmethod
     async def get_actions(db: AsyncSession) -> list[Action]:
-        stmt = select(Action)
+        stmt = select(Action).options(selectinload(Action.params))
         result = (await db.exec(stmt)).fetchall()
         return list(result)
 
     @staticmethod
-    async def get_action_by_id(action_id: int, db: AsyncSession) -> Action | None:
-        return await db.get(Action, action_id)
-
-    @staticmethod
-    async def get_action_with_params(action_id: int, session: AsyncSession):
+    async def get_action_by_id(action_id: int, db: AsyncSession) -> Action:
         stmt = (
             select(Action)
             .options(selectinload(Action.params))
             .where(Action.id == action_id)
         )
-        action = (await session.exec(stmt)).first()
+        action = (await db.exec(stmt)).first()
         return action
 
     @staticmethod
@@ -60,7 +55,7 @@ class ActionService:
         existing_action = (await db.exec(stmt)).first()
 
         if not existing_action:
-            return None
+            raise ValueError(f"Action with id={action_id} not found")
 
         existing_action.name = updated.name
         existing_action.description = updated.description
@@ -72,11 +67,25 @@ class ActionService:
 
     @staticmethod
     async def delete_action(action_id: int, db: AsyncSession) -> int | None:
-        result = await db.execute(select(Action).filter(Action.id == action_id))
-        action = result.scalars().first()
+        action = await db.get(Action, action_id)
 
         if not action:
-            return None
+            raise ValueError(f"Action with id={action_id} not found")
+
+        matches = await db.exec(
+            select(AgentsActionsMatches).where(
+                AgentsActionsMatches.action_id == action_id
+            )
+        )
+
+        for match in matches:
+            await db.delete(match)
+
+        params = await db.exec(
+            select(ActionParam).where(ActionParam.action_id == action_id)
+        )
+        for param in params:
+            await db.delete(param)
 
         await db.delete(action)
         await db.commit()

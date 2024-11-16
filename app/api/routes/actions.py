@@ -14,32 +14,35 @@ async def create_action(action: Action, db: AsyncSession = Depends(get_db)) -> A
     return await ActionService.create_action(action, db)
 
 
-@actions_router.post(
-    "/with_params", response_model=tuple[Action | None, list[ActionParam]]
-)
+@actions_router.post("/with_params", response_model=tuple[Action, list[ActionParam]])
 async def create_action_with_params(
     action: Action, params: list[ActionParam], db: AsyncSession = Depends(get_db)
-) -> tuple[Action | None, list[ActionParam]]:
-    # doesn't actually return those objects, but it adds them into db
-    return await ActionService.create_action_with_params(action, params, db)
+) -> tuple[Action, list[ActionParam]]:
+    action = await ActionService.create_action_with_params(action, params, db)
+    return await get_action_by_id(action.id, db)
 
 
-@actions_router.get("/", response_model=list[Action])
-async def get_actions(db: AsyncSession = Depends(get_db)) -> list[Action]:
-    return await ActionService.get_actions(db)
+@actions_router.get("/", response_model=list[tuple[Action, list[ActionParam]]] | None)
+async def get_actions(
+    db: AsyncSession = Depends(get_db),
+) -> list[tuple[Action, list[ActionParam]]] | None:
+    actions = await ActionService.get_actions(db)
+    result = []
+    for action in actions:
+        result.append((action, action.params))
+    return result
 
 
-@actions_router.get("/{action_id}", response_model=Action | None)
+@actions_router.get(
+    "/{action_id}", response_model=tuple[Action, list[ActionParam]] | None
+)
 async def get_action_by_id(
     action_id: int, db: AsyncSession = Depends(get_db)
-) -> Action | None:
-    return await ActionService.get_action_by_id(action_id, db)
-
-
-@actions_router.get("/{action_id}/params", response_model=list[ActionParam])
-async def get_action_params(action_id: int, db: AsyncSession = Depends(get_db)):
-    action = await ActionService.get_action_with_params(action_id, db)
-    return action.params
+) -> tuple[Action, list[ActionParam]] | None:
+    action = await ActionService.get_action_by_id(action_id, db)
+    if action is None:
+        return None
+    return action, action.params
 
 
 @actions_router.put("/{action_id}", response_model=Action | None)

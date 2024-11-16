@@ -18,7 +18,7 @@ async_engine = create_async_engine(DATABASE_URL, echo=True)
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    db = AsyncSession(async_engine)
+    db = AsyncSession(async_engine, expire_on_commit=False)
     try:
         yield db
     finally:
