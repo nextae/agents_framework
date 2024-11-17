@@ -11,7 +11,6 @@ class Agent(SQLModel, table=True):
     id: int = Field(sa_column=Column(Integer, autoincrement=True, primary_key=True))
     name: str
     description: str | None = Field(default=None, nullable=True)
-    instructions: str
     state: dict[str, StateValue] = Field(sa_column=Column(JSONB))
 
     conversation_history: list[AgentMessage] = Relationship()
