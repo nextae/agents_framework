@@ -20,3 +20,10 @@ class AgentService:
         db.commit()
         db.refresh(agent)
         return agent
+
+    @staticmethod
+    async def update_agent(agent: Agent, db: Session):
+        db.add(agent)
+        db.commit()
+        db.refresh(agent)
+        return agent

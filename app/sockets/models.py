@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.models.global_state import StateValue
+
 
 class AgentQueryRequest(BaseModel):
     agent_id: int
@@ -33,3 +35,12 @@ class AgentQueryResponse(BaseModel):
                 if args is not None
             ],
         )
+
+
+class UpdateStateRequest(BaseModel):
+    state: dict[str, StateValue]
+
+
+class UpdateAgentStateRequest(BaseModel):
+    agent_id: int
+    state: dict[str, StateValue]

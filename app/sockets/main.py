@@ -6,7 +6,15 @@ import socketio
 from app.llm.chain import create_chain
 from app.llm.models import Action, ActionArgument
 
-from .models import AgentQueryRequest, AgentQueryResponse
+from ..db.database import session
+from ..services.agent import AgentService
+from ..services.global_state import GlobalStateService
+from .models import (
+    AgentQueryRequest,
+    AgentQueryResponse,
+    UpdateAgentStateRequest,
+    UpdateStateRequest,
+)
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
@@ -58,3 +66,40 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
 
     response = AgentQueryResponse.from_llm_response(request.agent_id, llm_response)
     return response.model_dump()
+
+
+@sio.on("update_global_state")
+async def update_global_state(sid: str, data: Any) -> dict[str, Any]:
+    """Updates the global state."""
+
+    try:
+        request = UpdateStateRequest.model_validate(data)
+    except pydantic.ValidationError:
+        return {"error": "Validation error."}
+
+    with session() as db:
+        global_state = await GlobalStateService.get_state(db)
+        global_state.state = request.state
+        await GlobalStateService.update_state(global_state, db)
+
+    return request.model_dump()
+
+
+@sio.on("update_agent_state")
+async def update_agent_state(sid: str, data: Any) -> dict[str, Any]:
+    """Updates an Agent's state."""
+
+    try:
+        request = UpdateAgentStateRequest.model_validate(data)
+    except pydantic.ValidationError:
+        return {"error": "Validation error."}
+
+    with session() as db:
+        agent = await AgentService.get_agent(request.agent_id, db)
+        if agent is None:
+            return {"error": "Agent not found."}
+
+        agent.state = request.state
+        await AgentService.update_agent(agent, db)
+
+    return request.model_dump()

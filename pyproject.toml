@@ -25,7 +25,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "ruff==0.7.0",
-    "pre-commit==4.0.1"
+    "pre-commit==4.0.1",
+    "websocket-client==1.8.0",  # Needed for the test client in utils/socketio_client.py
 ]
 
 [tool.ruff]
