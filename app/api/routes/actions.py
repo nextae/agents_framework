@@ -1,59 +1,50 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.api.errors import NotFoundError
 from app.db.database import get_db
-from app.models.action import Action
-from app.models.action_param import ActionParam
+from app.models.action import Action, ActionRequest, ActionResponse, ActionUpdateRequest
 from app.services.action import ActionService
 
 actions_router = APIRouter(prefix="/actions")
 
 
-@actions_router.post("/", response_model=Action)
-async def create_action(action: Action, db: AsyncSession = Depends(get_db)) -> Action:
-    return await ActionService.create_action(action, db)
+@actions_router.post("", status_code=201)
+async def create_action(
+    action: ActionRequest, db: AsyncSession = Depends(get_db)
+) -> ActionResponse:
+    action = await ActionService.create_action(action, db)
+
+    return ActionResponse.model_validate(
+        action, update={"params": [], "conditions": []}
+    )
 
 
-@actions_router.post("/with_params", response_model=tuple[Action, list[ActionParam]])
-async def create_action_with_params(
-    action: Action, params: list[ActionParam], db: AsyncSession = Depends(get_db)
-) -> tuple[Action, list[ActionParam]]:
-    action = await ActionService.create_action_with_params(action, params, db)
-    return await get_action_by_id(action.id, db)
+@actions_router.get("", response_model=list[ActionResponse])
+async def get_actions(db: AsyncSession = Depends(get_db)) -> list[Action]:
+    return await ActionService.get_actions(db)
 
 
-@actions_router.get("/", response_model=list[tuple[Action, list[ActionParam]]] | None)
-async def get_actions(
-    db: AsyncSession = Depends(get_db),
-) -> list[tuple[Action, list[ActionParam]]] | None:
-    actions = await ActionService.get_actions(db)
-    result = []
-    for action in actions:
-        result.append((action, action.params))
-    return result
-
-
-@actions_router.get(
-    "/{action_id}", response_model=tuple[Action, list[ActionParam]] | None
-)
+@actions_router.get("/{action_id}", response_model=ActionResponse)
 async def get_action_by_id(
     action_id: int, db: AsyncSession = Depends(get_db)
-) -> tuple[Action, list[ActionParam]] | None:
+) -> Action:
     action = await ActionService.get_action_by_id(action_id, db)
     if action is None:
-        return None
-    return action, action.params
+        raise NotFoundError(f"Action with id {action_id} not found")
+
+    return action
 
 
-@actions_router.put("/{action_id}", response_model=Action | None)
+@actions_router.put("/{action_id}", response_model=ActionResponse)
 async def update_action(
-    action_id: int, action: Action, db: AsyncSession = Depends(get_db)
-) -> Action | None:
-    return await ActionService.update_action(action_id, action, db)
+    action_id: int,
+    action_update: ActionUpdateRequest,
+    db: AsyncSession = Depends(get_db),
+) -> Action:
+    return await ActionService.update_action(action_id, action_update, db)
 
 
-@actions_router.delete("/{action_id}", response_model=int | None)
-async def delete_action(
-    action_id: int, db: AsyncSession = Depends(get_db)
-) -> int | None:
+@actions_router.delete("/{action_id}")
+async def delete_action(action_id: int, db: AsyncSession = Depends(get_db)) -> None:
     return await ActionService.delete_action(action_id, db)

@@ -15,7 +15,7 @@ def connect():
 
 
 if __name__ == "__main__":
-    client.connect("http://localhost:8080", transports=["websocket"])
+    client.connect("http://localhost:8000", transports=["websocket"])
     while True:
         agent_id = int(input("Enter the agent ID: "))
         if agent_id == "/exit":

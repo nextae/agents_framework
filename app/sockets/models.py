@@ -10,7 +10,7 @@ class AgentQueryRequest(BaseModel):
 
 class ActionResponse(BaseModel):
     name: str
-    args: dict[str, Any]
+    params: dict[str, Any]
 
 
 class AgentQueryResponse(BaseModel):
@@ -28,8 +28,8 @@ class AgentQueryResponse(BaseModel):
             agent_id=agent_id,
             response=llm_response.response,
             actions=[
-                ActionResponse(name=action, args=args)
-                for action, args in llm_response.actions.model_dump().items()
-                if args is not None
+                ActionResponse(name=action, params=params)
+                for action, params in llm_response.actions.model_dump().items()
+                if params is not None
             ],
         )

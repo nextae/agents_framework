@@ -1,72 +1,61 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.response_models import ActionResponse, AgentResponse
+from app.api.errors import NotFoundError
 from app.db.database import get_db
-from app.models.agent import Agent
-from app.models.agent_message import AgentMessage
-from app.models.agents_actions_matches import AgentsActionsMatches
+from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequest
+from app.models.agents_actions_match import AgentsActionsMatch
 from app.services.agent import AgentService
 
 agents_router = APIRouter(prefix="/agents")
 
 
-@agents_router.get("/", response_model=list[AgentResponse])
-async def get_agents(db: AsyncSession = Depends(get_db)) -> list[AgentResponse]:
-    agents = await AgentService.get_agents(db)
-    resp = []
-    for agent in agents:
-        actions = []
-        for action in agent.actions:
-            actions.append(ActionResponse(action, action.params))
-        resp.append(AgentResponse(agent, agent.conversation_history, actions))
-
-    return resp
+@agents_router.get("", response_model=list[AgentResponse])
+async def get_agents(db: AsyncSession = Depends(get_db)) -> list[Agent]:
+    return await AgentService.get_agents(db)
 
 
 @agents_router.get("/{agent_id}", response_model=AgentResponse)
-async def get_agent(agent_id: int, db: AsyncSession = Depends(get_db)):
+async def get_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> Agent:
     agent = await AgentService.get_agent_by_id(agent_id, db)
-    actions = []
-    for action in agent.actions:
-        actions.append(ActionResponse(action, action.params))
-    resp = AgentResponse(agent, agent.conversation_history, actions)
-    return resp
+    if agent is None:
+        raise NotFoundError(f"Agent with id {agent_id} not found")
+
+    return agent
 
 
-@agents_router.post("/", response_model=AgentResponse)
+@agents_router.post("", status_code=201)
 async def create_agent(
-    agent: Agent, db: AsyncSession = Depends(get_db)
+    agent_create: AgentRequest, db: AsyncSession = Depends(get_db)
 ) -> AgentResponse:
-    agent = await AgentService.create_agent(agent, db)
-    return AgentResponse(agent, [], [])
+    agent = await AgentService.create_agent(agent_create, db)
+
+    return AgentResponse.model_validate(
+        agent, update={"actions": [], "conversation_history": []}
+    )
 
 
-@agents_router.put("/update_agent/{agent_id}", response_model=AgentResponse)
+@agents_router.put("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
-    agent_id: int, agent: Agent, db: AsyncSession = Depends(get_db)
-) -> AgentResponse:
-    return await AgentService.update_agent(agent_id, agent, db)
+    agent_id: int, agent_update: AgentUpdateRequest, db: AsyncSession = Depends(get_db)
+) -> Agent:
+    return await AgentService.update_agent(agent_id, agent_update, db)
 
 
-@agents_router.post("/assign_action", response_model=AgentsActionsMatches)
+@agents_router.delete("/{agent_id}")
+async def delete_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    return await AgentService.delete_agent(agent_id, db)
+
+
+@agents_router.post("/assign_action", response_model=AgentsActionsMatch)
 async def assign_action(
     agent_id: int, action_id: int, db: AsyncSession = Depends(get_db)
-) -> AgentsActionsMatches:
+) -> AgentsActionsMatch:
     return await AgentService.assign_action_to_agent(agent_id, action_id, db)
 
 
-@agents_router.post("/remove_action", response_model=tuple[int, int])
+@agents_router.post("/remove_action")
 async def remove_action(
     agent_id: int, action_id: int, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     return await AgentService.remove_action_from_agent(agent_id, action_id, db)
-
-
-@agents_router.post(
-    "/add_message/{agent_id}", response_model=AgentResponse
-)  # TODO datetime doesn't work :(
-async def add_message_to_agent(
-    agent_id: int, message: AgentMessage, db: AsyncSession = Depends(get_db)
-):
-    return await AgentService.create_agent_message(agent_id, message, db)

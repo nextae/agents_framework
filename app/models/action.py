@@ -1,22 +1,47 @@
-from langchain_core.tools import Tool
-from sqlmodel import Column, Field, Integer, Relationship, SQLModel
+from pydantic import BaseModel, create_model
+from sqlmodel import Field, Relationship, SQLModel
 
 from app.models.action_condition import ActionCondition
-from app.models.action_param import ActionParam
-from app.models.actions_conditions_matches import ActionConditionMatches
+from app.models.action_param import ActionParam, ActionParamResponse
+from app.models.actions_conditions_match import ActionConditionMatch
 
 
-class Action(SQLModel, table=True):
-    id: int = Field(sa_column=Column(Integer, autoincrement=True, primary_key=True))
+class ActionBase(SQLModel):
     name: str
+    description: str | None = None
+
+
+class Action(ActionBase, table=True):
+    id: int = Field(default=None, primary_key=True)
+
     params: list[ActionParam] = Relationship()
-    conditions: list[ActionCondition] = Relationship(link_model=ActionConditionMatches)
-    description: str | None = Field(default=None, nullable=True)
+    conditions: list[ActionCondition] = Relationship(link_model=ActionConditionMatch)
 
-    def to_tool(self) -> Tool:
-        # Placeholder - not necessary?
-        pass
+    def to_structured_output(self) -> type[BaseModel]:
+        """Converts the action to a structured output model."""
 
-    def to_structured_output(self):
-        # Placeholder - not necessary?
-        pass
+        return create_model(
+            self.name,
+            **{
+                param.name: (
+                    param.python_type,
+                    Field(..., description=param.description),
+                )
+                for param in self.params
+            },
+        )
+
+
+class ActionRequest(ActionBase):
+    pass
+
+
+class ActionUpdateRequest(SQLModel):
+    name: str | None = None
+    description: str | None = None
+
+
+class ActionResponse(ActionBase):
+    id: int
+    params: list[ActionParamResponse]
+    conditions: list[ActionCondition]
