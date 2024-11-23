@@ -2,6 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.llm.models import ChainOutput
+
 
 class AgentQueryRequest(BaseModel):
     agent_id: int
@@ -20,7 +22,7 @@ class AgentQueryResponse(BaseModel):
 
     @classmethod
     def from_llm_response(
-        cls, agent_id: int, llm_response: BaseModel
+        cls, agent_id: int, llm_response: ChainOutput
     ) -> "AgentQueryResponse":
         """Creates an AgentQueryResponse from an LLM response."""
 
