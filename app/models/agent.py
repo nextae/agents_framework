@@ -17,8 +17,10 @@ class AgentBase(SQLModel):
 class Agent(AgentBase, table=True):
     id: int = Field(default=None, primary_key=True)
 
-    conversation_history: list[AgentMessage] = Relationship()
-    actions: list[Action] = Relationship(link_model=AgentsActionsMatch)
+    conversation_history: list[AgentMessage] = Relationship(cascade_delete=True)
+    actions: list[Action] = Relationship(
+        back_populates="agents", link_model=AgentsActionsMatch
+    )
 
     def to_structured_output(self) -> type[BaseModel]:
         """Creates a Pydantic model for the structured output of the agent."""

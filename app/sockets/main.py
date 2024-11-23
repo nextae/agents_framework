@@ -3,8 +3,9 @@ from typing import Any
 import pydantic
 import socketio
 
-from ..db.database import Session
-from ..services.agent import AgentService
+from app.db.database import Session
+from app.services.agent import AgentService
+
 from .models import AgentQueryRequest, AgentQueryResponse
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")

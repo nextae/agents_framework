@@ -4,6 +4,8 @@ import socketio
 
 client = socketio.Client()
 
+PORT = 8080
+
 
 def query_agent_callback(data: dict[str, Any]) -> None:
     print(data)
@@ -15,7 +17,7 @@ def connect():
 
 
 if __name__ == "__main__":
-    client.connect("http://localhost:8000", transports=["websocket"])
+    client.connect(f"http://localhost:{PORT}", transports=["websocket"])
     while True:
         agent_id = int(input("Enter the agent ID: "))
         if agent_id == "/exit":
