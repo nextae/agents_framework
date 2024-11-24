@@ -27,7 +27,7 @@ async def get_action_param_by_id(
 ) -> ActionParam:
     param = await ActionParamService.get_action_param_by_id(action_param_id, db)
     if param is None:
-        raise NotFoundError(f"Action with id {action_param_id} not found")
+        raise NotFoundError(f"ActionParam with id {action_param_id} not found")
 
     return param
 
