@@ -1,11 +1,12 @@
 from logging.config import fileConfig
+from os import getenv
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 import app.models  # noqa: F401
-from app.db.database import DATABASE_URL
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -25,6 +26,15 @@ target_metadata = SQLModel.metadata
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
+
+load_dotenv()
+
+DATABASE_URL = (
+    f"postgresql://"
+    f"{getenv('POSTGRES_USER')}:"
+    f"{getenv('POSTGRES_PASSWORD')}"
+    f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
+)
 
 config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
