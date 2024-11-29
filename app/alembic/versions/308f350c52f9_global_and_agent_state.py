@@ -1,7 +1,7 @@
 """Global and agent state
 
 Revision ID: 308f350c52f9
-Revises: 56c110bc4b05
+Revises: 6b8ca1e5a098
 Create Date: 2024-11-09 23:06:58.112378
 
 """
@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision: str = "308f350c52f9"
-down_revision: str | None = "56c110bc4b05"
+down_revision: str | None = "6b8ca1e5a098"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

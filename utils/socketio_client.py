@@ -5,6 +5,8 @@ import socketio
 
 client = socketio.Client()
 
+PORT = 8080
+
 
 def query_agent() -> None:
     agent_id = int(input("Enter the agent ID: "))
@@ -55,7 +57,7 @@ def connect():
 
 
 if __name__ == "__main__":
-    client.connect("http://localhost:8000", transports=["websocket"])
+    client.connect(f"http://localhost:{PORT}", transports=["websocket"])
     while True:
         event = input(f"Enter the event ({', '.join(EVENTS)}): ")
         if event == "/exit":

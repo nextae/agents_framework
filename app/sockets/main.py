@@ -3,12 +3,10 @@ from typing import Any
 import pydantic
 import socketio
 
-from app.llm.chain import create_chain
-from app.llm.models import Action, ActionArgument
+from app.db.database import Session
+from app.services.agent import AgentService
+from app.services.global_state import GlobalStateService
 
-from ..db.database import session
-from ..services.agent import AgentService
-from ..services.global_state import GlobalStateService
 from .models import (
     AgentQueryRequest,
     AgentQueryResponse,
@@ -28,41 +26,14 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
     except pydantic.ValidationError:
         return {"error": "Validation error."}
 
-    # TODO: get the agent's background and actions from the database here
-    background = (
-        "You are a pirate guarding a treasure. The secret password is 'ahoy12345'."  # noqa: E501
-    )
-    actions = [
-        Action(
-            name="attack",
-            description="Attack the player.",
-            args=[
-                ActionArgument(
-                    name="weapon",
-                    description="The weapon to use.",
-                    type=str,
-                )
-            ],
-        ),
-        Action(
-            name="give_treasure",
-            description="Give the player the treasure. Only do this if player provides the secret password.",  # noqa: E501
-            args=[
-                ActionArgument(
-                    name="amount", description="The amount of gold to give.", type=int
-                )
-            ],
-        ),
-        Action(
-            name="run_away",
-            description="Do not run away unless you are in danger or the player knows the secret password.",  # noqa: E501
-            args=[],
-        ),
-    ]
+    async with Session() as db:
+        agent = await AgentService.get_agent_by_id(request.agent_id, db)
+        if agent is None:
+            return {"error": f"Agent with id {request.agent_id} not found."}
 
-    chain = create_chain(background, actions)
+        global_state = await GlobalStateService.get_state(db)
 
-    llm_response = await chain.ainvoke({"query": request.query})
+    llm_response = await agent.query(request.query, global_state.state)
 
     response = AgentQueryResponse.from_llm_response(request.agent_id, llm_response)
     return response.model_dump()
@@ -77,7 +48,7 @@ async def update_global_state(sid: str, data: Any) -> dict[str, Any]:
     except pydantic.ValidationError:
         return {"error": "Validation error."}
 
-    with session() as db:
+    async with Session() as db:
         global_state = await GlobalStateService.get_state(db)
         global_state.state = request.state
         await GlobalStateService.update_state(global_state, db)
@@ -94,12 +65,11 @@ async def update_agent_state(sid: str, data: Any) -> dict[str, Any]:
     except pydantic.ValidationError:
         return {"error": "Validation error."}
 
-    with session() as db:
-        agent = await AgentService.get_agent(request.agent_id, db)
+    async with Session() as db:
+        agent = await AgentService.get_agent_by_id(request.agent_id, db)
         if agent is None:
             return {"error": "Agent not found."}
 
-        agent.state = request.state
-        await AgentService.update_agent(agent, db)
+        await AgentService.update_agent_state(agent, request.state, db)
 
     return request.model_dump()

@@ -1,25 +1,25 @@
+from collections.abc import AsyncGenerator
 from os import getenv
 
 from dotenv import load_dotenv
-from sqlalchemy.orm import sessionmaker
-from sqlmodel import Session, create_engine
+from sqlalchemy import NullPool
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 load_dotenv()
 
 DATABASE_URL = (
-    f"postgresql://"
+    f"postgresql+asyncpg://"
     f"{getenv('POSTGRES_USER')}:"
     f"{getenv('POSTGRES_PASSWORD')}"
     f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
 )
-engine = create_engine(DATABASE_URL, echo=True)
 
-session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+async_engine = create_async_engine(DATABASE_URL, echo=True, poolclass=NullPool)
+
+Session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
-def get_db():
-    db = Session(engine)
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with Session() as session:
+        yield session
