@@ -7,6 +7,7 @@ from langchain_core.runnables import Runnable
 from langchain_openai import ChatOpenAI
 
 from app.llm.models import ChainInput, ChainOutput
+from app.llm.system_message import SYSTEM_MESSAGE_TEMPLATE
 
 if TYPE_CHECKING:
     from app.models import Agent
@@ -22,7 +23,7 @@ def create_chain(agent: "Agent") -> Runnable[ChainInput, ChainOutput]:
     chat_model = ChatOpenAI(model=OPENAI_MODEL)
     prompt = ChatPromptTemplate(
         [
-            ("system", agent.instructions or ""),
+            ("system", SYSTEM_MESSAGE_TEMPLATE),
             # TODO: add message history
             ("human", "{query}"),
         ]

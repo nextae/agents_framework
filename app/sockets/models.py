@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.llm.models import ChainOutput
+from app.models.global_state import State
 
 
 class AgentQueryRequest(BaseModel):
@@ -35,3 +36,12 @@ class AgentQueryResponse(BaseModel):
                 if params is not None
             ],
         )
+
+
+class UpdateStateRequest(BaseModel):
+    state: State
+
+
+class UpdateAgentStateRequest(BaseModel):
+    agent_id: int
+    state: State
