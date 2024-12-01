@@ -7,6 +7,7 @@ from app.models.action import Action
 from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage
 from app.models.agents_actions_match import AgentsActionsMatch
+from app.models.global_state import State
 from app.services.action import ActionService
 
 LOAD_OPTIONS = [
@@ -103,17 +104,19 @@ class AgentService:
         await db.commit()
 
     @staticmethod
-    async def create_agent_message(
-        agent_id: int, message: AgentMessage, db: AsyncSession
-    ):
-        agent = await AgentService.get_agent_by_id(agent_id, db)
-        if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
-
-        db.add(message)
-        await db.commit()
-
+    async def add_agent_message(
+        agent: Agent, message: AgentMessage, db: AsyncSession
+    ) -> Agent:
         agent.conversation_history.append(message)
+        db.add(agent)
+        await db.commit()
         await db.refresh(agent)
+        return agent
 
+    @staticmethod
+    async def update_agent_state(agent: Agent, state: State, db: AsyncSession) -> Agent:
+        agent.state = state
+        db.add(agent)
+        await db.commit()
+        await db.refresh(agent)
         return agent

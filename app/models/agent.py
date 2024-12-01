@@ -1,11 +1,13 @@
 from pydantic import BaseModel, create_model
-from sqlmodel import Field, Relationship, SQLModel
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlmodel import Column, Field, Relationship, SQLModel
 
 from app.llm.chain import create_chain
-from app.llm.models import ChainOutput
+from app.llm.models import ChainInput, ChainOutput
 from app.models.action import Action, ActionResponse
 from app.models.agent_message import AgentMessage
 from app.models.agents_actions_match import AgentsActionsMatch
+from app.models.global_state import State
 
 
 class AgentBase(SQLModel):
@@ -16,6 +18,7 @@ class AgentBase(SQLModel):
 
 class Agent(AgentBase, table=True):
     id: int = Field(default=None, primary_key=True)
+    state: State = Field(sa_column=Column(JSONB))
 
     conversation_history: list[AgentMessage] = Relationship(cascade_delete=True)
     actions: list[Action] = Relationship(
@@ -42,11 +45,17 @@ class Agent(AgentBase, table=True):
             actions=(actions_model, Field(..., description="The actions to take.")),
         )
 
-    async def query(self, query: str) -> ChainOutput:
+    async def query(self, query: str, global_state: State) -> ChainOutput:
         """Queries the agent."""
 
-        chain = create_chain(self)
-        return await chain.ainvoke({"query": query})
+        chain_input = ChainInput(
+            query=query,
+            instructions=self.instructions or "",
+            global_state=global_state,
+            agent_state=self.state,
+        )
+
+        return await create_chain(self).ainvoke(chain_input)
 
 
 class AgentRequest(AgentBase):
@@ -61,5 +70,4 @@ class AgentUpdateRequest(SQLModel):
 
 class AgentResponse(AgentBase):
     id: int
-    conversation_history: list[AgentMessage]
     actions: list[ActionResponse]

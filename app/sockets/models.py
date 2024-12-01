@@ -3,6 +3,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from app.llm.models import ChainOutput
+from app.models.global_state import State
 
 
 class AgentQueryRequest(BaseModel):
@@ -16,18 +17,14 @@ class ActionResponse(BaseModel):
 
 
 class AgentQueryResponse(BaseModel):
-    agent_id: int
     response: str
     actions: list[ActionResponse]
 
     @classmethod
-    def from_llm_response(
-        cls, agent_id: int, llm_response: ChainOutput
-    ) -> "AgentQueryResponse":
+    def from_llm_response(cls, llm_response: ChainOutput) -> "AgentQueryResponse":
         """Creates an AgentQueryResponse from an LLM response."""
 
         return cls(
-            agent_id=agent_id,
             response=llm_response.response,
             actions=[
                 ActionResponse(name=action, params=params)
@@ -35,3 +32,12 @@ class AgentQueryResponse(BaseModel):
                 if params is not None
             ],
         )
+
+
+class UpdateStateRequest(BaseModel):
+    state: State
+
+
+class UpdateAgentStateRequest(BaseModel):
+    agent_id: int
+    state: State

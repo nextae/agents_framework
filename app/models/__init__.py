@@ -5,6 +5,7 @@ from .action_param import ActionParam
 from .agent import Agent
 from .agent_message import AgentMessage
 from .agents_actions_match import AgentsActionsMatch
+from .global_state import GlobalState
 
 __all__ = (
     "Action",
@@ -14,4 +15,5 @@ __all__ = (
     "AgentMessage",
     "AgentsActionsMatch",
     "ActionParam",
+    "GlobalState",
 )
