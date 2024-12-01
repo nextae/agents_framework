@@ -24,7 +24,11 @@ def create_chain(agent: "Agent") -> Runnable[ChainInput, ChainOutput]:
     prompt = ChatPromptTemplate(
         [
             ("system", SYSTEM_MESSAGE_TEMPLATE),
-            # TODO: add message history
+            *[
+                message
+                for agent_message in agent.conversation_history
+                for message in agent_message.to_llm_messages()
+            ],
             ("human", "{query}"),
         ]
     )

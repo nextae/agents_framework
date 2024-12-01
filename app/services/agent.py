@@ -104,19 +104,13 @@ class AgentService:
         await db.commit()
 
     @staticmethod
-    async def create_agent_message(
-        agent_id: int, message: AgentMessage, db: AsyncSession
+    async def add_agent_message(
+        agent: Agent, message: AgentMessage, db: AsyncSession
     ) -> Agent:
-        agent = await AgentService.get_agent_by_id(agent_id, db)
-        if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
-
-        db.add(message)
-        await db.commit()
-
         agent.conversation_history.append(message)
+        db.add(agent)
+        await db.commit()
         await db.refresh(agent)
-
         return agent
 
     @staticmethod

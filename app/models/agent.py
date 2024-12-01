@@ -70,5 +70,4 @@ class AgentUpdateRequest(SQLModel):
 
 class AgentResponse(AgentBase):
     id: int
-    conversation_history: list[AgentMessage]
     actions: list[ActionResponse]
