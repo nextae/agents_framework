@@ -4,6 +4,7 @@ import pydantic
 import socketio
 
 from app.db.database import Session
+from app.models.agent_message import AgentMessage
 from app.services.agent import AgentService
 from app.services.global_state import GlobalStateService
 
@@ -33,9 +34,17 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
 
         global_state = await GlobalStateService.get_state(db)
 
-    llm_response = await agent.query(request.query, global_state.state)
+        llm_response = await agent.query(request.query, global_state.state)
 
-    response = AgentQueryResponse.from_llm_response(request.agent_id, llm_response)
+        response = AgentQueryResponse.from_llm_response(llm_response)
+        message = AgentMessage(
+            agent_id=agent.id,
+            query=request.query,
+            response=response.model_dump(),
+        )
+
+        await AgentService.add_agent_message(agent, message, db)
+
     return response.model_dump()
 
 
