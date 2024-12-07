@@ -114,6 +114,17 @@ class AgentService:
         return agent
 
     @staticmethod
+    async def delete_agent_messages(agent_id: int, db: AsyncSession) -> None:
+        agent = await AgentService.get_agent_by_id(agent_id, db)
+        if agent is None:
+            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+
+        agent.conversation_history.clear()
+
+        db.add(agent)
+        await db.commit()
+
+    @staticmethod
     async def update_agent_state(agent: Agent, state: State, db: AsyncSession) -> Agent:
         agent.state = state
         db.add(agent)
