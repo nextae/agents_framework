@@ -5,7 +5,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from app.api.errors import NotFoundError
 from app.models.action import Action, ActionRequest, ActionUpdateRequest
 
-LOAD_OPTIONS = [selectinload(Action.params), selectinload(Action.conditions)]
+LOAD_OPTIONS = [selectinload(Action.params)]
 
 
 class ActionService:
