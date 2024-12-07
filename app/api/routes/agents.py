@@ -47,6 +47,13 @@ async def delete_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> Non
     return await AgentService.delete_agent(agent_id, db)
 
 
+@agents_router.delete("/{agent_id}/messages", response_model=None)
+async def delete_agent_messages(
+    agent_id: int, db: AsyncSession = Depends(get_db)
+) -> None:
+    return await AgentService.delete_agent_messages(agent_id, db)
+
+
 @agents_router.post("/assign_action", response_model=AgentsActionsMatch)
 async def assign_action(
     agent_id: int, action_id: int, db: AsyncSession = Depends(get_db)
