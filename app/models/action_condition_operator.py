@@ -14,8 +14,12 @@ class ActionConditionOperatorBase(SQLModel):
         sa_column=Column(SAEnum(LogicalOperator, native_enum=False), nullable=False)
     )
     action_id: int = Field(nullable=True, foreign_key="action.id")
-    parent_id: int = Field(default=None, nullable=True)
-    root_id: int
+    parent_id: int = Field(
+        default=None, nullable=True, foreign_key="actionconditionoperator.id"
+    )
+    root_id: int = Field(
+        default=None, nullable=True, foreign_key="actionconditionoperator.id"
+    )
 
 
 class ActionConditionOperator(ActionConditionOperatorBase, table=True):

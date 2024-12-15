@@ -101,9 +101,7 @@ class ActionConditionTreeNode:
         if self.state_variable_name.startswith("global"):
             state = (await GlobalStateService.get_state(db)).state
         elif self.state_variable_name.startswith("agent-"):
-            agent_id = int(
-                self.state_variable_name.split("/")[0].split("-")[1]
-            )  # TODO get agent from action
+            agent_id = int(self.state_variable_name.split("/")[0].split("-")[1])
             agent = await AgentService.get_agent_by_id(agent_id, db)
             state = agent.state
         else:
@@ -232,6 +230,39 @@ class ActionConditionService:
         return condition_operator
 
     @staticmethod
+    async def create_condition_operator_root(
+        operator_request: ActionConditionOperatorRequest, db: AsyncSession
+    ) -> ActionConditionOperator:
+        operator = ActionConditionOperator.model_validate(operator_request)
+
+        db.add(operator)
+        await db.commit()
+        await db.refresh(operator)
+
+        operator.root_id = operator.id
+
+        if operator.action_id is not None:
+            try:
+                result = await ActionConditionService.get_all_conditions_by_action_id(
+                    operator.action_id, db
+                )
+                root = next(
+                    r
+                    for r in result
+                    if isinstance(r, ActionConditionOperator) and r.is_root()
+                )
+                raise ValueError(
+                    f"Action with id {operator.action_id} already has root assigned to node {root}"  # noqa: E501
+                )
+            except NotFoundError:
+                pass
+
+        await db.commit()
+        await db.refresh(operator)
+
+        return operator
+
+    @staticmethod
     async def create_condition(
         condition_request: ActionConditionRequest,
         db: AsyncSession,
@@ -259,6 +290,18 @@ class ActionConditionService:
         condition_id: int, db: AsyncSession
     ) -> ActionCondition | None:
         return await db.get(ActionCondition, condition_id)
+
+    @staticmethod
+    async def get_conditions(db: AsyncSession) -> list[ActionCondition]:
+        result = await db.exec(select(ActionCondition))
+        return list(result.all())
+
+    @staticmethod
+    async def get_condition_operators(
+        db: AsyncSession,
+    ) -> list[ActionConditionOperator]:
+        result = await db.exec(select(ActionConditionOperator))
+        return list(result.all())
 
     @staticmethod
     async def assign_all_operators_by_root_to_action(
@@ -299,7 +342,7 @@ class ActionConditionService:
         return operator.id, operator.action_id
 
     @staticmethod
-    async def remove_all_operators_by_root_to_action(
+    async def remove_all_operators_by_root_from_action(
         root_id: int, action_id: int, db: AsyncSession
     ) -> (int, int):
         operators = await ActionConditionService.get_all_conditions_by_root_id(
