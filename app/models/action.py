@@ -51,7 +51,7 @@ class Action(ActionBase, table=True):
 
     async def evaluate_conditions(self, db: AsyncSession) -> bool:
         tree = await self.__get_condition_tree(db)
-        return tree.evaluate_tree()
+        return await tree.evaluate_tree(db)
 
 
 class ActionRequest(ActionBase):

@@ -14,11 +14,11 @@ from app.models.action_condition_operator import (
     ActionConditionOperatorUpdateRequest,
     LogicalOperator,
 )
+from app.models.global_state import StateValue
+from app.services.global_state import GlobalStateService
 
 
 class ActionConditionTreeNode:
-    mock_state = {"number": "3", "name": "random", "fraction": "5.123123"}
-
     def __init__(
         self,
         node_id: int,
@@ -41,12 +41,12 @@ class ActionConditionTreeNode:
         child.parent = self
         child.root = self.root
 
-    def evaluate_tree(self) -> bool:
-        return self.root.__evaluate()
+    async def evaluate_tree(self, db: AsyncSession) -> bool:
+        return await self.root.__evaluate(db)
 
-    def __evaluate(self) -> bool:
+    async def __evaluate(self, db: AsyncSession) -> bool:
         if len(self.children) == 0:
-            state_var = ActionConditionTreeNode.mock_state[self.state_variable_name]
+            state_var = await self.__get_state_variable(db)
 
             if state_var is None:
                 raise KeyError(f"No state variable {self.state_variable_name} found")
@@ -81,10 +81,50 @@ class ActionConditionTreeNode:
             elif self.comparison == ComparisonMethod.AT_MOST:
                 return state_var <= expected_value
         else:
-            results = [child.__evaluate() for child in self.children]
+            results = [await child.__evaluate(db) for child in self.children]
             if self.logical_operator == LogicalOperator.AND:
                 return all(results)
             return any(results)
+
+    async def validate_leaf(self, db: AsyncSession) -> bool:
+        if self.logical_operator is not None:
+            raise ValueError("Node must be a leaf to validate")
+        try:
+            await self.__evaluate(db)
+        except (KeyError, TypeError, ValueError):
+            return False
+        return True
+
+    async def __get_state_variable(self, db: AsyncSession) -> StateValue | None:
+        from app.services.agent import AgentService
+
+        if self.state_variable_name.startswith("global"):
+            state = (await GlobalStateService.get_state(db)).state
+        elif self.state_variable_name.startswith("agent-"):
+            agent_id = int(
+                self.state_variable_name.split("/")[0].split("-")[1]
+            )  # TODO get agent from action
+            agent = await AgentService.get_agent_by_id(agent_id, db)
+            state = agent.state
+        else:
+            raise ValueError(
+                f"State variable name '{self.state_variable_name}' is not valid"
+            )
+
+        keys = self.state_variable_name.split("/")[1:]
+        current = state
+
+        try:
+            for key in keys:
+                if isinstance(current, dict):
+                    current = current[key]
+                elif isinstance(current, list):
+                    current = current[int(key)]
+                else:
+                    return None  # Unsupported type
+            return current
+        except (KeyError, IndexError, ValueError, TypeError):
+            return None
 
 
 class ActionConditionService:
@@ -116,9 +156,14 @@ class ActionConditionService:
         )
         operators = list(operators.all())
 
-        root = next((operator for operator in operators if operator.is_root()), None)
-        if not root:
-            raise ValueError("No root node found in the input")
+        root = [op for op in operators if op.is_root()]
+        if len(root) == 0:
+            raise NotFoundError(
+                f"No root node found in the input for action_id: {action_id}"
+            )
+        if len(root) > 1:
+            raise ValueError(f"Found multiple roots for action_id: {action_id}")
+        root = root[0]
 
         conditions = await db.exec(
             select(ActionCondition).where(ActionCondition.root_id == root.id)
@@ -162,7 +207,11 @@ class ActionConditionService:
 
             parent = root.to_tree_node()
 
-        children = [node for node in nodes if node.parent_id == parent.node_id]
+        children = [
+            node
+            for node in nodes
+            if node.parent_id == parent.node_id and parent.logical_operator is not None
+        ]
         for child in children:
             parent.add_child(
                 ActionConditionService.build_condition_tree(nodes, child.to_tree_node())
@@ -184,9 +233,15 @@ class ActionConditionService:
 
     @staticmethod
     async def create_condition(
-        condition_request: ActionConditionRequest, db: AsyncSession
+        condition_request: ActionConditionRequest,
+        db: AsyncSession,
+        validate: bool = False,
     ) -> ActionCondition:
         condition = ActionCondition.model_validate(condition_request)
+
+        if validate:
+            if not await condition.validate_condition(db):
+                raise ValueError("Condition is not valid")
 
         db.add(condition)
         await db.commit()
@@ -206,6 +261,22 @@ class ActionConditionService:
         return await db.get(ActionCondition, condition_id)
 
     @staticmethod
+    async def assign_all_operators_by_root_to_action(
+        root_id: int, action_id: int, db: AsyncSession
+    ) -> (int, int):
+        operators = await ActionConditionService.get_all_conditions_by_root_id(
+            root_id, db
+        )
+        operators = [op for op in operators if isinstance(op, ActionConditionOperator)]
+
+        for operator in operators:
+            await ActionConditionService.assign_condition_operator_to_action(
+                operator.id, action_id, db
+            )
+
+        return root_id, action_id
+
+    @staticmethod
     async def assign_condition_operator_to_action(
         operator_id: int, action_id: int, db: AsyncSession
     ) -> (int, int):
@@ -217,29 +288,31 @@ class ActionConditionService:
         if not operator:
             raise NotFoundError(f"Operator with id {operator} not found")
 
-        if not operator.is_root():
-            raise ValueError(
-                f"Operator with id {operator_id} must be a root to assign to action"
-            )
-
         action = await ActionService.get_action_by_id(action_id, db)
         if not action:
             raise NotFoundError(f"Action with id {action_id} not found")
-
-        assigned_conditions = (
-            await ActionConditionService.get_all_conditions_by_action_id(action_id, db)
-        )
-        if len(assigned_conditions) != 0:
-            raise ValueError(
-                f"Action with id: {action_id} already has assigned "
-                f"conditions with root: {assigned_conditions[0].root_id}"
-            )
 
         operator.action_id = action.id
         db.add(operator)
         await db.commit()
         await db.refresh(operator)
         return operator.id, operator.action_id
+
+    @staticmethod
+    async def remove_all_operators_by_root_to_action(
+        root_id: int, action_id: int, db: AsyncSession
+    ) -> (int, int):
+        operators = await ActionConditionService.get_all_conditions_by_root_id(
+            root_id, db
+        )
+        operators = [op for op in operators if isinstance(op, ActionConditionOperator)]
+
+        for operator in operators:
+            await ActionConditionService.remove_condition_operator_from_action(
+                operator.id, action_id, db
+            )
+
+        return root_id, action_id
 
     @staticmethod
     async def remove_condition_operator_from_action(
@@ -252,11 +325,6 @@ class ActionConditionService:
         )
         if not operator:
             raise NotFoundError(f"Operator with id {operator} not found")
-
-        if not operator.is_root():
-            raise ValueError(
-                f"Operator with id {operator_id} must be a root to assign to action"
-            )
 
         action = await ActionService.get_action_by_id(action_id, db)
         if not action:

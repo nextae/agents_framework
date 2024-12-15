@@ -2,6 +2,7 @@ from enum import Enum
 
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Column, Field, SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 
 class ComparisonMethod(str, Enum):
@@ -16,7 +17,7 @@ class ComparisonMethod(str, Enum):
 class ActionConditionBase(SQLModel):
     parent_id: int = Field(foreign_key="actionconditionoperator.id")
     root_id: int = Field(foreign_key="actionconditionoperator.id")
-    state_variable_name: str  # Foreign key to state or something?
+    state_variable_name: str
     comparison: ComparisonMethod = Field(
         sa_column=Column(SAEnum(ComparisonMethod, native_enum=False), nullable=False)
     )
@@ -26,9 +27,9 @@ class ActionConditionBase(SQLModel):
 class ActionCondition(ActionConditionBase, table=True):
     id: int = Field(default=None, primary_key=True)
 
-    def validate_condition(self):
-        # TODO sometime in the future
-        pass
+    async def validate_condition(self, db: AsyncSession) -> bool:
+        tree_node = self.to_tree_node()
+        return await tree_node.validate_leaf(db)
 
     def to_tree_node(self):
         from app.services.action_condition import ActionConditionTreeNode
