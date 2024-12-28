@@ -5,7 +5,7 @@ import socketio
 
 client = socketio.Client()
 
-PORT = 8080
+PORT = 8000
 
 
 def query_agent() -> None:
@@ -56,15 +56,25 @@ def connect():
     print("Connected to the server.")
 
 
+@client.event
+def agent_response(data: dict[str, Any]):
+    print_response_callback(data)
+
+
 if __name__ == "__main__":
     client.connect(f"http://localhost:{PORT}", transports=["websocket"])
     while True:
-        event = input(f"Enter the event ({', '.join(EVENTS)}): ")
-        if event == "/exit":
+        events_text = "\n".join(
+            f"{i}. {event}" for i, event in enumerate(EVENTS, start=1)
+        )
+        event_index = input(f"Enter the event:\n{events_text}\n")
+        if event_index == "/exit":
             break
 
-        event_fn = EVENTS.get(event)
-        if event_fn is None:
+        try:
+            event = list(EVENTS.keys())[int(event_index) - 1]
+            event_fn = EVENTS[event]
+        except (ValueError, IndexError):
             print("Invalid event.")
             continue
 

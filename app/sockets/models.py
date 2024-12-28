@@ -11,14 +11,14 @@ class AgentQueryRequest(BaseModel):
     query: str
 
 
-class ActionResponse(BaseModel):
+class ActionQueryResponse(BaseModel):
     name: str
     params: dict[str, Any]
 
 
 class AgentQueryResponse(BaseModel):
     response: str
-    actions: list[ActionResponse]
+    actions: list[ActionQueryResponse]
 
     @classmethod
     def from_llm_response(cls, llm_response: ChainOutput) -> "AgentQueryResponse":
@@ -27,7 +27,7 @@ class AgentQueryResponse(BaseModel):
         return cls(
             response=llm_response.response,
             actions=[
-                ActionResponse(name=action, params=params)
+                ActionQueryResponse(name=action, params=params)
                 for action, params in llm_response.actions.model_dump().items()
                 if params is not None
             ],

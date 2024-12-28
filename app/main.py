@@ -3,8 +3,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from socketio import ASGIApp
 
-from app.api.errors import NotFoundError
-from app.api.exception_handlers import not_found_error_handler
+from app.api.errors import ConflictError, NotFoundError
+from app.api.exception_handlers import conflict_error_handler, not_found_error_handler
 from app.api.main import api_router
 from app.sockets.main import sio
 
@@ -22,6 +22,7 @@ app.add_middleware(
 
 app.include_router(api_router)
 app.add_exception_handler(NotFoundError, not_found_error_handler)
+app.add_exception_handler(ConflictError, conflict_error_handler)
 
 
 @app.get("/")
