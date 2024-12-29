@@ -4,7 +4,6 @@ from pydantic import BaseModel, create_model
 from sqlmodel import Field, Relationship, SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.action_condition_operator import ActionConditionOperator
 from app.models.action_param import ActionParam, ActionParamResponse
 from app.models.agents_actions_match import AgentsActionsMatch
 
@@ -19,7 +18,7 @@ class ActionBase(SQLModel):
 
 
 class Action(ActionBase, table=True):
-    id: int = Field(primary_key=True)
+    id: int = Field(default=None, primary_key=True)
 
     params: list[ActionParam] = Relationship(cascade_delete=True)
     agents: list["Agent"] = Relationship(
@@ -66,4 +65,3 @@ class ActionUpdateRequest(SQLModel):
 class ActionResponse(ActionBase):
     id: int
     params: list[ActionParamResponse]
-    conditions: list[ActionConditionOperator]  # Not sure what to return

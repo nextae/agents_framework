@@ -13,6 +13,7 @@ from app.models.action_condition_operator import (
     ActionConditionOperatorRequest,
     ActionConditionOperatorUpdateRequest,
     LogicalOperator,
+    NewConditionTreeRequest,
 )
 from app.models.global_state import StateValue
 from app.services.global_state import GlobalStateService
@@ -127,6 +128,23 @@ class ActionConditionTreeNode:
 
 class ActionConditionService:
     @staticmethod
+    async def try_get_root_for_action_id(
+        action_id: int, db: AsyncSession
+    ) -> ActionConditionOperator | None:
+        operators = await db.exec(
+            select(ActionConditionOperator).where(
+                ActionConditionOperator.action_id == action_id
+            )
+        )
+        operators = list(operators.all())
+        root = [op for op in operators if op.is_root()]
+        if len(root) == 0:
+            return None
+        if len(root) > 1:
+            raise ValueError(f"Found multiple roots for action_id: {action_id}")
+        return root[0]
+
+    @staticmethod
     async def get_all_conditions_by_root_id(
         root_id: int, db: AsyncSession
     ) -> list[ActionCondition | ActionConditionOperator]:
@@ -154,14 +172,9 @@ class ActionConditionService:
         )
         operators = list(operators.all())
 
-        root = [op for op in operators if op.is_root()]
-        if len(root) == 0:
-            raise NotFoundError(
-                f"No root node found in the input for action_id: {action_id}"
-            )
-        if len(root) > 1:
-            raise ValueError(f"Found multiple roots for action_id: {action_id}")
-        root = root[0]
+        root = await ActionConditionService.try_get_root_for_action_id(action_id, db)
+        if root is None:
+            raise ValueError(f"No root found for action_id: {action_id}")
 
         conditions = await db.exec(
             select(ActionCondition).where(ActionCondition.root_id == root.id)
@@ -231,31 +244,24 @@ class ActionConditionService:
 
     @staticmethod
     async def create_condition_operator_root(
-        operator_request: ActionConditionOperatorRequest, db: AsyncSession
+        tree_request: NewConditionTreeRequest, db: AsyncSession
     ) -> ActionConditionOperator:
-        operator = ActionConditionOperator.model_validate(operator_request)
+        operator = ActionConditionOperator.model_validate(tree_request)
+
+        if operator.action_id is not None:
+            root = await ActionConditionService.try_get_root_for_action_id(
+                operator.action_id, db
+            )
+            if root:
+                raise ValueError(
+                    f"Action with id {operator.action_id} already has root assigned with id {root.id}"  # noqa: E501
+                )
 
         db.add(operator)
         await db.commit()
         await db.refresh(operator)
 
         operator.root_id = operator.id
-
-        if operator.action_id is not None:
-            try:
-                result = await ActionConditionService.get_all_conditions_by_action_id(
-                    operator.action_id, db
-                )
-                root = next(
-                    r
-                    for r in result
-                    if isinstance(r, ActionConditionOperator) and r.is_root()
-                )
-                raise ValueError(
-                    f"Action with id {operator.action_id} already has root assigned to node {root}"  # noqa: E501
-                )
-            except NotFoundError:
-                pass
 
         await db.commit()
         await db.refresh(operator)
@@ -306,7 +312,16 @@ class ActionConditionService:
     @staticmethod
     async def assign_all_operators_by_root_to_action(
         root_id: int, action_id: int, db: AsyncSession
-    ) -> (int, int):
+    ) -> tuple[int, int]:
+        operator = await ActionConditionService.get_condition_operator_by_id(
+            root_id, db
+        )
+        print(f"OPERATOR: {operator}")
+        if operator is None:
+            raise NotFoundError(f"Operator with id {root_id} not found")
+        if not operator.is_root():
+            raise ValueError(f"Operator with id {root_id} is not a root")
+
         operators = await ActionConditionService.get_all_conditions_by_root_id(
             root_id, db
         )
@@ -340,44 +355,6 @@ class ActionConditionService:
         await db.commit()
         await db.refresh(operator)
         return operator.id, operator.action_id
-
-    @staticmethod
-    async def remove_all_operators_by_root_from_action(
-        root_id: int, action_id: int, db: AsyncSession
-    ) -> (int, int):
-        operators = await ActionConditionService.get_all_conditions_by_root_id(
-            root_id, db
-        )
-        operators = [op for op in operators if isinstance(op, ActionConditionOperator)]
-
-        for operator in operators:
-            await ActionConditionService.remove_condition_operator_from_action(
-                operator.id, action_id, db
-            )
-
-        return root_id, action_id
-
-    @staticmethod
-    async def remove_condition_operator_from_action(
-        operator_id: int, action_id: int, db: AsyncSession
-    ) -> int:
-        from app.services.action import ActionService
-
-        operator = await ActionConditionService.get_condition_operator_by_id(
-            operator_id, db
-        )
-        if not operator:
-            raise NotFoundError(f"Operator with id {operator} not found")
-
-        action = await ActionService.get_action_by_id(action_id, db)
-        if not action:
-            raise NotFoundError(f"Action with id {action_id} not found")
-
-        operator.action_id = None
-        db.add(operator)
-        await db.commit()
-        await db.refresh(operator)
-        return operator.id
 
     @staticmethod
     async def update_condition(

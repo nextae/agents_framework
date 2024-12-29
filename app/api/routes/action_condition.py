@@ -14,6 +14,7 @@ from app.models.action_condition_operator import (
     ActionConditionOperatorRequest,
     ActionConditionOperatorResponse,
     ActionConditionOperatorUpdateRequest,
+    NewConditionTreeRequest,
 )
 from app.services.action_condition import ActionConditionService
 
@@ -24,7 +25,9 @@ condition_router = APIRouter(prefix="/conditions")
 async def create_action_condition(
     condition_request: ActionConditionRequest, db: AsyncSession = Depends(get_db)
 ):
-    condition = await ActionConditionService.create_condition(condition_request, db)
+    condition = await ActionConditionService.create_condition(
+        condition_request, db, True
+    )
 
     return ActionConditionResponse.model_validate(condition)
 
@@ -42,10 +45,10 @@ async def create_action_condition_operator(
 
 @condition_router.post("/tree")
 async def create_new_condition_tree(
-    operator_request: ActionConditionOperatorRequest, db: AsyncSession = Depends(get_db)
+    tree_request: NewConditionTreeRequest, db: AsyncSession = Depends(get_db)
 ):
     operator = await ActionConditionService.create_condition_operator_root(
-        operator_request, db
+        tree_request, db
     )
 
     return ActionConditionOperatorResponse.model_validate(operator)
@@ -121,27 +124,34 @@ async def update_action_condition_operator_by_id(
     )
 
 
-@condition_router.delete(
-    "/condition/{condition_id}", response_model=ActionConditionResponse
-)
+@condition_router.delete("/condition/{condition_id}")
 async def delete_action_condition_by_id(
     condition_id: int, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     return await ActionConditionService.delete_condition(condition_id, db)
 
 
-@condition_router.delete(
-    "/operator/{operator_id}", response_model=ActionConditionOperatorResponse
-)
+@condition_router.delete("/operator/{operator_id}")
 async def delete_action_condition_operator_by_id(
     operator_id: int, db: AsyncSession = Depends(get_db)
-):
+) -> None:
     return await ActionConditionService.delete_condition_operator(operator_id, db)
 
 
 @condition_router.delete("/condition_tree/{root_id}")
 async def delete_tree_by_root_id(root_id: int, db: AsyncSession = Depends(get_db)):
     operator = await ActionConditionService.get_condition_operator_by_id(root_id, db)
+    if operator is None:
+        raise NotFoundError("Root with id {root_id} not found")
     if not operator.is_root():
         raise ValueError("Given id is not a root")
     return await ActionConditionService.delete_condition_operator(root_id, db, True)
+
+
+@condition_router.put("/condition_tree/assign")
+async def assign_tree_to_action(
+    root_id: int, action_id: int, db: AsyncSession = Depends(get_db)
+) -> tuple[int, int]:
+    return await ActionConditionService.assign_all_operators_by_root_to_action(
+        root_id, action_id, db
+    )

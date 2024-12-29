@@ -14,16 +14,16 @@ class ActionConditionOperatorBase(SQLModel):
         sa_column=Column(SAEnum(LogicalOperator, native_enum=False), nullable=False)
     )
     action_id: int = Field(nullable=True, foreign_key="action.id")
+
+
+class ActionConditionOperator(ActionConditionOperatorBase, table=True):
+    id: int = Field(default=None, primary_key=True)
     parent_id: int = Field(
         default=None, nullable=True, foreign_key="actionconditionoperator.id"
     )
     root_id: int = Field(
         default=None, nullable=True, foreign_key="actionconditionoperator.id"
     )
-
-
-class ActionConditionOperator(ActionConditionOperatorBase, table=True):
-    id: int = Field(default=None, primary_key=True)
 
     def to_tree_node(self):
         from app.services.action_condition import ActionConditionTreeNode
@@ -35,6 +35,11 @@ class ActionConditionOperator(ActionConditionOperatorBase, table=True):
 
 
 class ActionConditionOperatorRequest(ActionConditionOperatorBase):
+    parent_id: int
+    root_id: int
+
+
+class NewConditionTreeRequest(ActionConditionOperatorBase):
     pass
 
 
@@ -47,3 +52,5 @@ class ActionConditionOperatorUpdateRequest(SQLModel):
 
 class ActionConditionOperatorResponse(ActionConditionOperatorBase):
     id: int
+    parent_id: int | None
+    root_id: int | None
