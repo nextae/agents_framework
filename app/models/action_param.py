@@ -1,7 +1,7 @@
 import enum
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import model_validator
 from sqlalchemy import Column, Enum, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Field, SQLModel
@@ -59,18 +59,17 @@ class ActionParam(ActionParamBase, table=True):
 
 
 class ActionParamRequest(ActionParamBase):
-    @field_validator("literal_values")
-    @classmethod
-    def validate_literal_values(
-        cls, v: list[LiteralValue] | None, info: ValidationInfo
-    ) -> list[LiteralValue] | None:
+    @model_validator(mode="after")
+    def validate_literal_values(self) -> Self:
         """Validates the literal values."""
 
-        param_type = info.data.get("type")
-        if param_type != ActionParamType.LITERAL and v is not None:
+        if self.type != ActionParamType.LITERAL and self.literal_values is not None:
             raise ValueError("Literal values are only allowed for the literal type")
 
-        return v
+        if self.type == ActionParamType.LITERAL and self.literal_values is None:
+            raise ValueError("Literal values are required for the literal type")
+
+        return self
 
 
 class ActionParamUpdateRequest(ActionParamRequest):

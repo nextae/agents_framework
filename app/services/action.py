@@ -50,3 +50,10 @@ class ActionService:
 
         await db.delete(action)
         await db.commit()
+
+    @staticmethod
+    async def agent_has_trigger_actions(agent_id: int, db: AsyncSession) -> bool:
+        result = await db.exec(
+            select(Action).where(Action.triggered_agent_id == agent_id)
+        )
+        return result.first() is not None

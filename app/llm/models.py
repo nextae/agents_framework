@@ -5,11 +5,25 @@ from pydantic import BaseModel
 from app.models.global_state import State
 
 
+class AgentDetails(TypedDict):
+    agent_id: int
+    agent_name: str
+    agent_description: str
+
+
+class PlayerDetails(TypedDict):
+    # TODO: player id?
+    player_name: str
+    player_description: str
+
+
 class ChainInput(TypedDict):
     query: str
     instructions: str
+    caller: AgentDetails | PlayerDetails
     global_state: State
     agent_state: State
+    action_agents: dict[str, AgentDetails]
 
 
 class ChainOutput(BaseModel):

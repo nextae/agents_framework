@@ -2,7 +2,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
+from app.api.errors import ConflictError, NotFoundError
 from app.models.action import Action
 from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage
@@ -15,6 +15,10 @@ LOAD_OPTIONS = [
     selectinload(Agent.conversation_history),
 ]
 
+EXTRA_LOAD_OPTIONS = LOAD_OPTIONS + [
+    selectinload(Agent.actions).selectinload(Action.triggered_agent)
+]
+
 
 class AgentService:
     @staticmethod
@@ -24,7 +28,17 @@ class AgentService:
 
     @staticmethod
     async def get_agent_by_id(agent_id: int, db: AsyncSession) -> Agent | None:
-        return await db.get(Agent, agent_id, options=LOAD_OPTIONS)
+        return await db.get(
+            Agent, agent_id, options=LOAD_OPTIONS, populate_existing=True
+        )
+
+    @staticmethod
+    async def get_agent_with_populated_actions(
+        agent_id: int, db: AsyncSession
+    ) -> Agent | None:
+        return await db.get(
+            Agent, agent_id, options=EXTRA_LOAD_OPTIONS, populate_existing=True
+        )
 
     @staticmethod
     async def create_agent(agent_request: AgentRequest, db: AsyncSession) -> Agent:
@@ -48,7 +62,7 @@ class AgentService:
 
         match = await db.get(AgentsActionsMatch, (agent_id, action.id))
         if match is not None:
-            raise ValueError(
+            raise ConflictError(
                 f"Action with id {action_id} has already been assigned to agent with id {agent_id}"  # noqa: E501
             )
 
@@ -99,18 +113,22 @@ class AgentService:
         if not agent:
             raise NotFoundError(f"Agent with id {agent_id} not found")
 
+        if await ActionService.agent_has_trigger_actions(agent_id, db):
+            raise ConflictError(
+                f"Agent with id {agent_id} has existing trigger actions"
+            )
+
         await db.delete(agent)
         await db.commit()
 
     @staticmethod
     async def add_agent_message(
-        agent: Agent, message: AgentMessage, db: AsyncSession
-    ) -> Agent:
-        agent.conversation_history.append(message)
-        db.add(agent)
+        message: AgentMessage, db: AsyncSession
+    ) -> AgentMessage:
+        db.add(message)
         await db.commit()
-        await db.refresh(agent)
-        return agent
+        await db.refresh(message)
+        return message
 
     @staticmethod
     async def delete_agent_messages(agent_id: int, db: AsyncSession) -> None:

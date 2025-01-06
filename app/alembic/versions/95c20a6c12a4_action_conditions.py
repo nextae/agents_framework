@@ -1,7 +1,7 @@
 """Action conditions
 
 Revision ID: 95c20a6c12a4
-Revises: 87f37185bb0c
+Revises: d52284b3f2f8
 Create Date: 2025-01-06 11:29:10.137935
 
 """
@@ -14,7 +14,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "95c20a6c12a4"
-down_revision: str | None = "87f37185bb0c"
+down_revision: str | None = "d52284b3f2f8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

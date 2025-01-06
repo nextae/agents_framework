@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, create_model
 from sqlmodel import Field, Relationship, SQLModel
@@ -14,12 +14,16 @@ if TYPE_CHECKING:
 
 class ActionBase(SQLModel):
     name: str
+    triggered_agent_id: int | None = None
     description: str | None = None
 
 
 class Action(ActionBase, table=True):
     id: int = Field(default=None, primary_key=True)
 
+    triggered_agent_id: int | None = Field(default=None, foreign_key="agent.id")
+
+    triggered_agent: Optional["Agent"] = Relationship()
     params: list[ActionParam] = Relationship(cascade_delete=True)
     agents: list["Agent"] = Relationship(
         back_populates="actions", link_model=AgentsActionsMatch
@@ -58,6 +62,7 @@ class ActionRequest(ActionBase):
 
 
 class ActionUpdateRequest(SQLModel):
+    triggered_agent_id: int | None = None
     name: str | None = None
     description: str | None = None
 

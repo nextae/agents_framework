@@ -1,10 +1,13 @@
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlmodel import TIMESTAMP, Column, Field, SQLModel
+from sqlmodel import TIMESTAMP, Column, Field, Relationship, SQLModel
 from typing_extensions import TypedDict
+
+if TYPE_CHECKING:
+    from app.models import Agent
 
 
 class ActionResponseDict(TypedDict):
@@ -20,11 +23,17 @@ class QueryResponseDict(TypedDict):
 class AgentMessage(SQLModel, table=True):
     id: int = Field(default=None, primary_key=True)
     agent_id: int = Field(foreign_key="agent.id")
+    caller_agent_id: int | None = Field(default=None, foreign_key="agent.id")
     query: str
     response: QueryResponseDict = Field(sa_column=Column(JSONB))
     timestamp: datetime = Field(
         sa_column=Column(TIMESTAMP(timezone=True)),
         default_factory=lambda: datetime.now(UTC),
+    )
+
+    agent: "Agent" = Relationship(
+        back_populates="conversation_history",
+        sa_relationship_kwargs={"foreign_keys": "[AgentMessage.agent_id]"},
     )
 
     def to_llm_messages(self) -> tuple[HumanMessage, AIMessage]:
