@@ -1,6 +1,7 @@
 from pydantic import BaseModel, create_model
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.llm.chain import create_chain
 from app.llm.models import ChainInput, ChainOutput
@@ -18,14 +19,14 @@ class AgentBase(SQLModel):
 
 class Agent(AgentBase, table=True):
     id: int = Field(default=None, primary_key=True)
-    state: State = Field(sa_column=Column(JSONB))
+    state: State = Field(default={}, sa_column=Column(JSONB))
 
     conversation_history: list[AgentMessage] = Relationship(cascade_delete=True)
     actions: list[Action] = Relationship(
         back_populates="agents", link_model=AgentsActionsMatch
     )
 
-    def to_structured_output(self) -> type[BaseModel]:
+    async def to_structured_output(self, db: AsyncSession) -> type[BaseModel]:
         """Creates a Pydantic model for the structured output of the agent."""
 
         actions_model = create_model(
@@ -36,6 +37,7 @@ class Agent(AgentBase, table=True):
                     Field(..., description=action.description),
                 )
                 for action in self.actions
+                if await action.evaluate_conditions(db)
             },
         )
 
@@ -45,7 +47,7 @@ class Agent(AgentBase, table=True):
             actions=(actions_model, Field(..., description="The actions to take.")),
         )
 
-    async def query(self, query: str, global_state: State) -> ChainOutput:
+    async def query(self, query: str, global_state: State, db) -> ChainOutput:
         """Queries the agent."""
 
         chain_input = ChainInput(
@@ -54,8 +56,8 @@ class Agent(AgentBase, table=True):
             global_state=global_state,
             agent_state=self.state,
         )
-
-        return await create_chain(self).ainvoke(chain_input)
+        chain = await create_chain(self, db)
+        return await chain.ainvoke(chain_input)
 
 
 class AgentRequest(AgentBase):
