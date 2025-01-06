@@ -38,7 +38,7 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
 
         global_state = await GlobalStateService.get_state(db)
 
-        llm_response = await agent.query(request.query, global_state.state)
+        llm_response = await agent.query(request.query, global_state.state, db)
 
         response = AgentQueryResponse.from_llm_response(llm_response)
 
@@ -76,7 +76,7 @@ async def _trigger_agents(
         print(f"Triggering agent {triggered_agent.name} from action {action.name}")
 
         llm_response = await triggered_agent.query_from_action(
-            action_response, agent, global_state.state
+            action_response, agent, global_state.state, db
         )
 
         response = AgentQueryResponse.from_llm_response(llm_response)

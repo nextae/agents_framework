@@ -12,7 +12,6 @@ from app.services.action import ActionService
 
 LOAD_OPTIONS = [
     selectinload(Agent.actions).selectinload(Action.params),
-    selectinload(Agent.actions).selectinload(Action.conditions),
     selectinload(Agent.conversation_history),
 ]
 

@@ -2,14 +2,14 @@ from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, create_model
 from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.models.action_condition import ActionCondition
 from app.models.action_param import ActionParam, ActionParamResponse
-from app.models.actions_conditions_match import ActionConditionMatch
 from app.models.agents_actions_match import AgentsActionsMatch
 
 if TYPE_CHECKING:
     from app.models import Agent
+    from app.services.action_condition import ActionConditionTreeNode
 
 
 class ActionBase(SQLModel):
@@ -25,7 +25,6 @@ class Action(ActionBase, table=True):
 
     triggered_agent: Optional["Agent"] = Relationship()
     params: list[ActionParam] = Relationship(cascade_delete=True)
-    conditions: list[ActionCondition] = Relationship(link_model=ActionConditionMatch)
     agents: list["Agent"] = Relationship(
         back_populates="actions", link_model=AgentsActionsMatch
     )
@@ -44,6 +43,19 @@ class Action(ActionBase, table=True):
             },
         )
 
+    async def __get_condition_tree(self, db: AsyncSession) -> "ActionConditionTreeNode":
+        from app.services.action_condition import ActionConditionService
+
+        conditions = await ActionConditionService.get_all_conditions_by_action_id(
+            self.id, db
+        )
+        tree = ActionConditionService.build_condition_tree(conditions)
+        return tree
+
+    async def evaluate_conditions(self, db: AsyncSession) -> bool:
+        tree = await self.__get_condition_tree(db)
+        return await tree.evaluate_tree(db)
+
 
 class ActionRequest(ActionBase):
     pass
@@ -58,4 +70,3 @@ class ActionUpdateRequest(SQLModel):
 class ActionResponse(ActionBase):
     id: int
     params: list[ActionParamResponse]
-    conditions: list[ActionCondition]
