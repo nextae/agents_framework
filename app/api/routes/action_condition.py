@@ -21,10 +21,12 @@ from app.services.action_condition import ActionConditionService
 condition_router = APIRouter(prefix="/conditions")
 
 
-@condition_router.post("/condition", status_code=201)
+@condition_router.post(
+    "/condition", status_code=201, response_model=ActionConditionResponse
+)
 async def create_action_condition(
     condition_request: ActionConditionRequest, db: AsyncSession = Depends(get_db)
-):
+) -> ActionConditionResponse:
     condition = await ActionConditionService.create_condition(
         condition_request, db, True
     )
@@ -32,10 +34,12 @@ async def create_action_condition(
     return ActionConditionResponse.model_validate(condition)
 
 
-@condition_router.post("/operator", status_code=201)
+@condition_router.post(
+    "/operator", status_code=201, response_model=ActionConditionOperatorResponse
+)
 async def create_action_condition_operator(
     operator_request: ActionConditionOperatorRequest, db: AsyncSession = Depends(get_db)
-):
+) -> ActionConditionOperatorResponse:
     operator = await ActionConditionService.create_condition_operator(
         operator_request, db
     )
@@ -43,10 +47,10 @@ async def create_action_condition_operator(
     return ActionConditionOperatorResponse.model_validate(operator)
 
 
-@condition_router.post("/tree")
+@condition_router.post("/tree", response_model=ActionConditionOperatorResponse)
 async def create_new_condition_tree(
     tree_request: NewConditionTreeRequest, db: AsyncSession = Depends(get_db)
-):
+) -> ActionConditionOperatorResponse:
     operator = await ActionConditionService.create_condition_operator_root(
         tree_request, db
     )
