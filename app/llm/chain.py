@@ -30,7 +30,7 @@ async def create_chain(
             *[
                 message
                 for agent_message in agent.conversation_history
-                for message in agent_message.to_llm_messages()
+                for message in await agent_message.to_llm_messages(db)
             ],
             ("human", "{query}"),
         ]

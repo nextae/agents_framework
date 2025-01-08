@@ -1,4 +1,5 @@
 import json
+import threading
 from typing import Any
 
 import socketio
@@ -7,14 +8,17 @@ client = socketio.Client()
 
 PORT = 8000
 
+response_event = threading.Event()
+
 
 def query_agent() -> None:
-    agent_id = int(input("Enter the agent ID: "))
+    agent_id = int(input("Enter the Agent ID: "))
+    player_id = int(input("Enter the Player ID: "))
     query = input("Enter the query: ")
 
     client.emit(
         "query_agent",
-        {"agent_id": agent_id, "query": query},
+        {"agent_id": agent_id, "player_id": player_id, "query": query},
         callback=print_response_callback,
     )
 
@@ -42,6 +46,8 @@ def update_agent_state() -> None:
 
 def print_response_callback(data: dict[str, Any]) -> None:
     print(data)
+    response_event.set()
+    response_event.clear()
 
 
 EVENTS = {
@@ -58,7 +64,7 @@ def connect():
 
 @client.event
 def agent_response(data: dict[str, Any]):
-    print_response_callback(data)
+    print(data)
 
 
 if __name__ == "__main__":
@@ -79,4 +85,5 @@ if __name__ == "__main__":
             continue
 
         event_fn()
+        response_event.wait(timeout=10)
     client.disconnect()

@@ -43,18 +43,23 @@ class Action(ActionBase, table=True):
             },
         )
 
-    async def __get_condition_tree(self, db: AsyncSession) -> "ActionConditionTreeNode":
+    async def __get_condition_tree(
+        self, db: AsyncSession
+    ) -> "ActionConditionTreeNode | None":
         from app.services.action_condition import ActionConditionService
 
         conditions = await ActionConditionService.get_all_conditions_by_action_id(
             self.id, db
         )
+        if not conditions:
+            return None
+
         tree = ActionConditionService.build_condition_tree(conditions)
         return tree
 
     async def evaluate_conditions(self, db: AsyncSession) -> bool:
         tree = await self.__get_condition_tree(db)
-        return await tree.evaluate_tree(db)
+        return await tree.evaluate_tree(db) if tree else True
 
 
 class ActionRequest(ActionBase):

@@ -8,6 +8,7 @@ from app.models.global_state import State
 
 class AgentQueryRequest(BaseModel):
     agent_id: int
+    player_id: int
     query: str
 
 
