@@ -12,7 +12,7 @@ class AgentDetails(TypedDict):
 
 
 class PlayerDetails(TypedDict):
-    # TODO: player id?
+    player_id: int
     player_name: str
     player_description: str
 
@@ -20,7 +20,6 @@ class PlayerDetails(TypedDict):
 class ChainInput(TypedDict):
     query: str
     instructions: str
-    caller: AgentDetails | PlayerDetails
     global_state: State
     agent_state: State
     action_agents: dict[str, AgentDetails]

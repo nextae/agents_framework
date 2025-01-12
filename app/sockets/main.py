@@ -9,6 +9,7 @@ from app.models import Agent, GlobalState
 from app.models.agent_message import AgentMessage
 from app.services.agent import AgentService
 from app.services.global_state import GlobalStateService
+from app.services.player import PlayerService
 
 from .models import (
     AgentQueryRequest,
@@ -30,22 +31,24 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
         return {"error": "Validation error."}
 
     async with Session() as db:
-        agent = await AgentService.get_agent_with_populated_actions(
-            request.agent_id, db
-        )
+        agent = await AgentService.get_populated_agent(request.agent_id, db)
         if agent is None:
             return {"error": f"Agent with id {request.agent_id} not found."}
 
+        player = await PlayerService.get_player_by_id(request.player_id, db)
+        if player is None:
+            return {"error": f"Player with id {request.player_id} not found."}
+
         global_state = await GlobalStateService.get_state(db)
 
-        llm_response = await agent.query(request.query, global_state.state, db)
+        llm_response = await agent.query(request.query, player, global_state.state, db)
 
         response = AgentQueryResponse.from_llm_response(llm_response)
 
         await sio.emit("agent_response", response.model_dump())
         message = AgentMessage(
             agent_id=agent.id,
-            caller_agent_id=None,
+            caller_player_id=player.id,
             query=request.query,
             response=response.model_dump(),
         )
@@ -53,6 +56,8 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
         await AgentService.add_agent_message(message, db)
 
         await _trigger_agents(agent, global_state, response, db)
+
+    return {"success": True}
 
 
 async def _trigger_agents(
@@ -69,14 +74,17 @@ async def _trigger_agents(
         if action.triggered_agent_id is None:
             continue
 
-        triggered_agent = await AgentService.get_agent_with_populated_actions(
+        triggered_agent = await AgentService.get_populated_agent(
             action.triggered_agent_id, db
         )
+        if triggered_agent is None:
+            print(f"Agent with id {action.triggered_agent_id} not found.")
+            continue
 
         print(f"Triggering agent {triggered_agent.name} from action {action.name}")
 
-        llm_response = await triggered_agent.query_from_action(
-            action_response, agent, global_state.state, db
+        llm_response = await triggered_agent.query(
+            str(action_response.params), agent, global_state.state, db
         )
 
         response = AgentQueryResponse.from_llm_response(llm_response)

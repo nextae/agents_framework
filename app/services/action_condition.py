@@ -165,16 +165,16 @@ class ActionConditionService:
     async def get_all_conditions_by_action_id(
         action_id: int, db: AsyncSession
     ) -> list[ActionCondition | ActionConditionOperator]:
+        root = await ActionConditionService.try_get_root_for_action_id(action_id, db)
+        if root is None:
+            return []
+
         operators = await db.exec(
             select(ActionConditionOperator).where(
                 ActionConditionOperator.action_id == action_id
             )
         )
         operators = list(operators.all())
-
-        root = await ActionConditionService.try_get_root_for_action_id(action_id, db)
-        if root is None:
-            raise ValueError(f"No root found for action_id: {action_id}")
 
         conditions = await db.exec(
             select(ActionCondition).where(ActionCondition.root_id == root.id)

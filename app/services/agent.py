@@ -10,13 +10,11 @@ from app.models.agents_actions_match import AgentsActionsMatch
 from app.models.global_state import State
 from app.services.action import ActionService
 
-LOAD_OPTIONS = [
-    selectinload(Agent.actions).selectinload(Action.params),
-    selectinload(Agent.conversation_history),
-]
+LOAD_OPTIONS = [selectinload(Agent.actions).selectinload(Action.params)]
 
 EXTRA_LOAD_OPTIONS = LOAD_OPTIONS + [
-    selectinload(Agent.actions).selectinload(Action.triggered_agent)
+    selectinload(Agent.conversation_history),
+    selectinload(Agent.actions).selectinload(Action.triggered_agent),
 ]
 
 
@@ -33,9 +31,12 @@ class AgentService:
         )
 
     @staticmethod
-    async def get_agent_with_populated_actions(
-        agent_id: int, db: AsyncSession
-    ) -> Agent | None:
+    async def get_populated_agent(agent_id: int, db: AsyncSession) -> Agent | None:
+        """
+        Gets an agent with its conversation history
+        and actions relationships fully populated.
+        """
+
         return await db.get(
             Agent, agent_id, options=EXTRA_LOAD_OPTIONS, populate_existing=True
         )
@@ -132,7 +133,7 @@ class AgentService:
 
     @staticmethod
     async def delete_agent_messages(agent_id: int, db: AsyncSession) -> None:
-        agent = await AgentService.get_agent_by_id(agent_id, db)
+        agent = await AgentService.get_populated_agent(agent_id, db)
         if agent is None:
             raise NotFoundError(f"Agent with id {agent_id} does not exist")
 
