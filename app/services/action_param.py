@@ -1,6 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.services.action import ActionService
 from app.api.errors import NotFoundError
 from app.models.action_param import (
     ActionParam,
@@ -15,6 +16,11 @@ class ActionParamService:
         action_param_request: ActionParamRequest, db: AsyncSession
     ) -> ActionParam:
         param = ActionParam.model_validate(action_param_request)
+
+        action = await ActionService.get_action_by_id(param.action_id, db)
+        if action is None:
+            raise NotFoundError(f"Action with id {param.action_id} not found")
+
         db.add(param)
         await db.commit()
         await db.refresh(param)
@@ -42,6 +48,10 @@ class ActionParamService:
         param = await ActionParamService.get_action_param_by_id(action_param_id, db)
         if not param:
             raise NotFoundError(f"ActionParam with id {action_param_id} not found")
+
+        action = await ActionService.get_action_by_id(param.action_id, db)
+        if action is None:
+            raise NotFoundError(f"Action with id {param.action_id} not found")
 
         param_update_data = action_param_update.model_dump(exclude_unset=True)
         param.sqlmodel_update(param_update_data)
