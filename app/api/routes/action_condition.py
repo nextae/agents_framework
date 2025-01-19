@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
+from app.api.errors import NotFoundError, ConflictError
 from app.db.database import get_db
 from app.models.action_condition import (
     ActionCondition,
@@ -146,9 +146,9 @@ async def delete_action_condition_operator_by_id(
 async def delete_tree_by_root_id(root_id: int, db: AsyncSession = Depends(get_db)):
     operator = await ActionConditionService.get_condition_operator_by_id(root_id, db)
     if operator is None:
-        raise NotFoundError("Root with id {root_id} not found")
+        raise NotFoundError(f"Root with id {root_id} not found")
     if not operator.is_root():
-        raise ValueError("Given id is not a root")
+        raise ConflictError("Given id is not a root")
     return await ActionConditionService.delete_condition_operator(root_id, db, True)
 
 

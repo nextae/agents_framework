@@ -12,6 +12,13 @@ class ActionService:
     @staticmethod
     async def create_action(action_request: ActionRequest, db: AsyncSession) -> Action:
         action = Action.model_validate(action_request)
+
+        if action_request.triggered_agent_id is not None:
+            from app.services.agent import AgentService
+            triggered_agent = await AgentService.get_agent_by_id(action_request.triggered_agent_id, db)
+            if triggered_agent is None:
+                raise NotFoundError(f"Agent with id {action_request.triggered_agent_id} not found")
+
         db.add(action)
         await db.commit()
         await db.refresh(action)
@@ -35,6 +42,13 @@ class ActionService:
             raise NotFoundError(f"Action with id {action_id} not found")
 
         action_update_data = action_update.model_dump(exclude_unset=True)
+
+        if action_update.triggered_agent_id is not None:
+            from app.services.agent import AgentService
+            triggered_agent = await AgentService.get_agent_by_id(action_update.triggered_agent_id, db)
+            if triggered_agent is None:
+                raise NotFoundError(f"Agent with id {action_update.triggered_agent_id} not found")
+
         action.sqlmodel_update(action_update_data)
 
         db.add(action)

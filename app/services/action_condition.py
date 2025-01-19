@@ -1,7 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
+from app.api.errors import NotFoundError, ConflictError
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,
@@ -17,6 +17,7 @@ from app.models.action_condition_operator import (
 )
 from app.models.global_state import StateValue
 from app.services.global_state import GlobalStateService
+from app.services.action import ActionService
 
 
 class ActionConditionTreeNode:
@@ -104,9 +105,11 @@ class ActionConditionTreeNode:
         elif self.state_variable_name.startswith("agent-"):
             agent_id = int(self.state_variable_name.split("/")[0].split("-")[1])
             agent = await AgentService.get_agent_by_id(agent_id, db)
+            if agent is None:
+                raise NotFoundError(f'Agent with id {agent_id} not found')
             state = agent.state
         else:
-            raise ValueError(
+            raise ConflictError(
                 f"State variable name '{self.state_variable_name}' is not valid"
             )
 
@@ -141,7 +144,7 @@ class ActionConditionService:
         if len(root) == 0:
             return None
         if len(root) > 1:
-            raise ValueError(f"Found multiple roots for action_id: {action_id}")
+            raise ConflictError(f"Found multiple roots for action_id: {action_id}")
         return root[0]
 
     @staticmethod
@@ -237,6 +240,12 @@ class ActionConditionService:
             condition_operator_request
         )
 
+        await ActionConditionService.__check_parent_and_root(condition_operator.parent_id, condition_operator.root_id, db)
+
+        action = await ActionService.get_action_by_id(condition_operator.action_id, db)
+        if action is None:
+            raise NotFoundError(f"Action with id {condition_operator.action_id} not found")
+
         db.add(condition_operator)
         await db.commit()
         await db.refresh(condition_operator)
@@ -249,11 +258,15 @@ class ActionConditionService:
         operator = ActionConditionOperator.model_validate(tree_request)
 
         if operator.action_id is not None:
+            action = await ActionService.get_action_by_id(operator.action_id, db)
+            if action is None:
+                raise NotFoundError(f"Action with id {operator.action_id} not found")
+
             root = await ActionConditionService.try_get_root_for_action_id(
                 operator.action_id, db
             )
             if root:
-                raise ValueError(
+                raise ConflictError(
                     f"Action with id {operator.action_id} already has root assigned with id {root.id}"  # noqa: E501
                 )
 
@@ -276,9 +289,11 @@ class ActionConditionService:
     ) -> ActionCondition:
         condition = ActionCondition.model_validate(condition_request)
 
+        await ActionConditionService.__check_parent_and_root(condition.parent_id, condition.root_id, db)
+
         if validate:
             if not await condition.validate_condition(db):
-                raise ValueError("Condition is not valid")
+                raise ConflictError("Condition is not valid")
 
         db.add(condition)
         await db.commit()
@@ -316,11 +331,10 @@ class ActionConditionService:
         operator = await ActionConditionService.get_condition_operator_by_id(
             root_id, db
         )
-        print(f"OPERATOR: {operator}")
         if operator is None:
             raise NotFoundError(f"Operator with id {root_id} not found")
         if not operator.is_root():
-            raise ValueError(f"Operator with id {root_id} is not a root")
+            raise ConflictError(f"Operator with id {root_id} is not a root")
 
         operators = await ActionConditionService.get_all_conditions_by_root_id(
             root_id, db
@@ -366,8 +380,13 @@ class ActionConditionService:
         if not condition:
             raise NotFoundError(f"Condition with id {condition_id} not found")
 
+        await ActionConditionService.__check_parent_and_root(condition_update.parent_id, condition_update.root_id, db)
+
         condition_update_data = condition_update.model_dump(exclude_unset=True)
         condition.sqlmodel_update(condition_update_data)
+
+        if not await condition.validate_condition(db):
+            raise ConflictError("Condition is not valid")
 
         db.add(condition)
         await db.commit()
@@ -385,6 +404,12 @@ class ActionConditionService:
         )
         if not operator:
             raise NotFoundError(f"Operator with id {operator_id} not found")
+
+        await ActionConditionService.__check_parent_and_root(operator_update.parent_id, operator_update.root_id, db)
+
+        action = await ActionService.get_action_by_id(operator_update.action_id, db)
+        if action is None:
+            raise NotFoundError(f"Action with id {operator_update.action_id} not found")
 
         operator_update_data = operator_update.model_dump(exclude_unset=True)
         operator.sqlmodel_update(operator_update_data)
@@ -427,3 +452,16 @@ class ActionConditionService:
 
         await db.delete(condition)
         await db.commit()
+
+    @staticmethod
+    async def __check_parent_and_root(parent_id: int | None, root_id: int | None, db: AsyncSession) -> None:
+        if parent_id is not None:
+            parent = await ActionConditionService.get_condition_operator_by_id(parent_id, db)
+            if parent is None:
+                raise NotFoundError(f"No operator with id {parent_id} found")
+
+        root = await ActionConditionService.get_condition_operator_by_id(root_id, db)
+        if root is None:
+            raise NotFoundError(f"No root with id {root_id} found")
+        if not root.is_root():
+            raise ConflictError(f"Operator with id {root_id} is not a root")
