@@ -75,3 +75,8 @@ class ActionUpdateRequest(SQLModel):
 class ActionResponse(ActionBase):
     id: int
     params: list[ActionParamResponse]
+
+
+class ActionEvaluationResult(BaseModel):
+    action_id: int
+    result: bool

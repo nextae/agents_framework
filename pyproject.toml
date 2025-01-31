@@ -20,6 +20,8 @@ dependencies = [
     "langchain==0.3.4",
     "langchain-openai==0.2.3",
     "alembic==1.13.3",
+    "streamlit==1.41.1",
+    "streamlit-pydantic @ git+https://github.com/lukasmasuch/streamlit-pydantic"
 ]
 
 [project.optional-dependencies]

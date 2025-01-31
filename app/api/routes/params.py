@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.errors import NotFoundError
-from app.db.database import get_db
+from app.core.database import get_db
 from app.models.action_param import (
     ActionParam,
     ActionParamRequest,
@@ -43,7 +43,7 @@ async def update_action_param(
     )
 
 
-@params_router.delete("/{action_param_id}")
+@params_router.delete("/{action_param_id}", status_code=204)
 async def delete_action_param(
     action_param_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:

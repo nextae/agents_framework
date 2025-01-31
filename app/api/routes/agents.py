@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.errors import NotFoundError
-from app.db.database import get_db
+from app.core.database import get_db
+from app.models import AgentMessage
 from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequest
 from app.models.agents_actions_match import AgentsActionsMatch
 from app.services.agent import AgentService
@@ -42,12 +43,19 @@ async def update_agent(
     return await AgentService.update_agent(agent_id, agent_update, db)
 
 
-@agents_router.delete("/{agent_id}")
+@agents_router.delete("/{agent_id}", status_code=204)
 async def delete_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> None:
     return await AgentService.delete_agent(agent_id, db)
 
 
-@agents_router.delete("/{agent_id}/messages", response_model=None)
+@agents_router.get("/{agent_id}/messages")
+async def get_agent_messages(
+    agent_id: int, db: AsyncSession = Depends(get_db)
+) -> list[AgentMessage]:
+    return await AgentService.get_agent_messages(agent_id, db)
+
+
+@agents_router.delete("/{agent_id}/messages", status_code=204)
 async def delete_agent_messages(
     agent_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:

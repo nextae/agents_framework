@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
-from app.db.database import get_db
-from app.models.action import Action, ActionRequest, ActionResponse, ActionUpdateRequest
+from app.api.errors import ConflictError, NotFoundError
+from app.core.database import get_db
+from app.models.action import (
+    Action,
+    ActionEvaluationResult,
+    ActionRequest,
+    ActionResponse,
+    ActionUpdateRequest,
+)
 from app.services.action import ActionService
+from app.services.action_condition import ConditionEvaluationError
 
 actions_router = APIRouter(prefix="/actions")
 
@@ -45,6 +52,16 @@ async def update_action(
     return await ActionService.update_action(action_id, action_update, db)
 
 
-@actions_router.delete("/{action_id}")
+@actions_router.delete("/{action_id}", status_code=204)
 async def delete_action(action_id: int, db: AsyncSession = Depends(get_db)) -> None:
     return await ActionService.delete_action(action_id, db)
+
+
+@actions_router.post("/{action_id}/evaluate_conditions")
+async def evaluate_action_conditions(
+    action_id: int, db: AsyncSession = Depends(get_db)
+) -> ActionEvaluationResult:
+    try:
+        return await ActionService.evaluate_action_conditions(action_id, db)
+    except ConditionEvaluationError as e:
+        raise ConflictError(str(e))

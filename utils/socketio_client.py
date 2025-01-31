@@ -6,7 +6,7 @@ import socketio
 
 client = socketio.Client()
 
-PORT = 8000
+PORT = 8080
 
 response_event = threading.Event()
 

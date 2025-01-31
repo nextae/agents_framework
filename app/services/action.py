@@ -3,7 +3,12 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.api.errors import NotFoundError
-from app.models.action import Action, ActionRequest, ActionUpdateRequest
+from app.models.action import (
+    Action,
+    ActionEvaluationResult,
+    ActionRequest,
+    ActionUpdateRequest,
+)
 
 LOAD_OPTIONS = [selectinload(Action.params)]
 
@@ -15,9 +20,14 @@ class ActionService:
 
         if action_request.triggered_agent_id is not None:
             from app.services.agent import AgentService
-            triggered_agent = await AgentService.get_agent_by_id(action_request.triggered_agent_id, db)
+
+            triggered_agent = await AgentService.get_agent_by_id(
+                action_request.triggered_agent_id, db
+            )
             if triggered_agent is None:
-                raise NotFoundError(f"Agent with id {action_request.triggered_agent_id} not found")
+                raise NotFoundError(
+                    f"Agent with id {action_request.triggered_agent_id} not found"
+                )
 
         db.add(action)
         await db.commit()
@@ -45,9 +55,14 @@ class ActionService:
 
         if action_update.triggered_agent_id is not None:
             from app.services.agent import AgentService
-            triggered_agent = await AgentService.get_agent_by_id(action_update.triggered_agent_id, db)
+
+            triggered_agent = await AgentService.get_agent_by_id(
+                action_update.triggered_agent_id, db
+            )
             if triggered_agent is None:
-                raise NotFoundError(f"Agent with id {action_update.triggered_agent_id} not found")
+                raise NotFoundError(
+                    f"Agent with id {action_update.triggered_agent_id} not found"
+                )
 
         action.sqlmodel_update(action_update_data)
 
@@ -71,3 +86,15 @@ class ActionService:
             select(Action).where(Action.triggered_agent_id == agent_id)
         )
         return result.first() is not None
+
+    @staticmethod
+    async def evaluate_action_conditions(
+        action_id: int, db: AsyncSession
+    ) -> ActionEvaluationResult:
+        action = await ActionService.get_action_by_id(action_id, db)
+        if action is None:
+            raise NotFoundError(f"Action with id {action_id} not found")
+
+        return ActionEvaluationResult(
+            action_id=action_id, result=await action.evaluate_conditions(db)
+        )

@@ -18,7 +18,7 @@ class ActionConditionOperatorBase(SQLModel):
 
 class ActionConditionOperator(ActionConditionOperatorBase, table=True):
     id: int = Field(default=None, primary_key=True)
-    parent_id: int = Field(
+    parent_id: int | None = Field(
         default=None, nullable=True, foreign_key="actionconditionoperator.id"
     )
     root_id: int = Field(

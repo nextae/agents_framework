@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError, ConflictError
-from app.db.database import get_db
+from app.api.errors import ConflictError, NotFoundError
+from app.core.database import get_db
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,
@@ -47,7 +47,9 @@ async def create_action_condition_operator(
     return ActionConditionOperatorResponse.model_validate(operator)
 
 
-@condition_router.post("/tree", response_model=ActionConditionOperatorResponse)
+@condition_router.post(
+    "/tree", status_code=201, response_model=ActionConditionOperatorResponse
+)
 async def create_new_condition_tree(
     tree_request: NewConditionTreeRequest, db: AsyncSession = Depends(get_db)
 ) -> ActionConditionOperatorResponse:
@@ -128,21 +130,21 @@ async def update_action_condition_operator_by_id(
     )
 
 
-@condition_router.delete("/condition/{condition_id}")
+@condition_router.delete("/condition/{condition_id}", status_code=204)
 async def delete_action_condition_by_id(
     condition_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:
     return await ActionConditionService.delete_condition(condition_id, db)
 
 
-@condition_router.delete("/operator/{operator_id}")
+@condition_router.delete("/operator/{operator_id}", status_code=204)
 async def delete_action_condition_operator_by_id(
     operator_id: int, db: AsyncSession = Depends(get_db)
 ) -> None:
     return await ActionConditionService.delete_condition_operator(operator_id, db)
 
 
-@condition_router.delete("/condition_tree/{root_id}")
+@condition_router.delete("/condition_tree/{root_id}", status_code=204)
 async def delete_tree_by_root_id(root_id: int, db: AsyncSession = Depends(get_db)):
     operator = await ActionConditionService.get_condition_operator_by_id(root_id, db)
     if operator is None:
