@@ -19,22 +19,31 @@
     ```bash
     pip install .
     ```
-2. Start the app:
+2. Start the API:
     ```bash
     uvicorn app.main:socket_app --reload
     ```
-3. The app is available on http://127.0.0.1:8000
+3. Start the UI:
+   ```bash
+   python3 -m streamlit run ui/main.py
+   ```
+4. The app is available on:
+   - UI: http://127.0.0.1:8501
+   - API: http://127.0.0.1:8000
 
 #### Docker
-1. Build the image
+1. Build the images
     ```bash
     docker build -t agents-framework:latest .
+    docker build -t agents-framework-ui:latest -f ui/Dockerfile .
     ```
 2. Run the app
     ```bash
    docker compose up
     ```
-3. The app is available on http://127.0.0.1:8080
+3. The app is available on:
+   - UI: http://127.0.0.1:8501
+   - API: http://127.0.0.1:8080
 
 ---
 ### Database backups and restore

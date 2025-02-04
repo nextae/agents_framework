@@ -24,6 +24,8 @@ __all__ = (
     "Player",
     "Condition",
     "Operator",
+    "CallerMessage",
+    "AgentMessage",
 )
 
 
@@ -115,7 +117,12 @@ class Player(BaseModel):
     id: int = Field(..., title="ID", readOnly=True)
     name: str = Field(..., description="The name of the player.")
     description: str = Field(
-        ..., description="A description of the player.", format="multi-line"
+        ...,
+        description=(
+            "Description of the player.\n\n"
+            "This is what agents will know about this player."
+        ),
+        format="multi-line",
     )
 
     @classmethod
@@ -126,9 +133,9 @@ class Player(BaseModel):
 
 
 class Condition(BaseModel):
-    id: int = Field(..., title="ID", readOnly=True)
-    root_id: int = Field(..., title="Root ID")
-    parent_id: int = Field(..., title="Parent ID")
+    id: int = Field(default=0, title="ID", readOnly=True)
+    root_id: int = Field(default=0, title="Root ID")
+    parent_id: int = Field(default=0, title="Parent ID")
     state_variable_name: str
     comparison: ComparisonMethod
     expected_value: str
@@ -147,7 +154,10 @@ class Condition(BaseModel):
             return True
 
     def to_node(
-        self, node_id: str | None = None, position: tuple[int, int] = (90, 60)
+        self,
+        node_id: str | None = None,
+        position: tuple[int, int] = (90, 60),
+        agent: Agent | None = None,
     ) -> sf.StreamlitFlowNode:
         data = self.model_dump()
 
@@ -156,8 +166,11 @@ class Condition(BaseModel):
             if not self.is_expected_value_text()
             else f'"{self.expected_value}"'
         )
+        state_text = "Global" if agent is None else f"Agent: {agent.name}"
+        state_variable = self.state_variable_name.split("/", 1)[1]
         data["content"] = (
-            f"{self.state_variable_name} {self.comparison.value} {expected_value}"
+            f"{state_variable} {self.comparison.value} {expected_value}"
+            f'<p style="color: #9FA7BC">{state_text}</p>'
         )
         data["type"] = "condition"
         return sf.StreamlitFlowNode(
@@ -180,10 +193,10 @@ class Condition(BaseModel):
 
 
 class Operator(BaseModel):
-    id: int = Field(..., title="ID", readOnly=True)
-    root_id: int = Field(..., title="Root ID")
-    parent_id: int | None = Field(..., title="Parent ID")
-    action_id: int = Field(..., title="Action ID")
+    id: int = Field(default=0, title="ID", readOnly=True)
+    root_id: int = Field(default=0, title="Root ID")
+    parent_id: int | None = Field(default=0, title="Parent ID")
+    action_id: int = Field(default=0, title="Action ID")
     logical_operator: LogicalOperator
 
     @classmethod
@@ -203,9 +216,9 @@ class Operator(BaseModel):
             id=node_id or f"operator_{self.id}",
             pos=position,
             data=data,
-            node_type="input" if self.parent_id is None else "default",
+            node_type="input" if self.is_root() else "default",
             style={
-                "background": "#333949",
+                "background": "#333949" if not self.is_root() else "#212530",
                 "color": "white",
                 "width": "50px",
                 "height": "50px",

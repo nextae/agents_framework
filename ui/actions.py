@@ -8,33 +8,42 @@ import streamlit_pydantic as sp
 from app.models.action_condition import ComparisonMethod
 from app.models.action_condition_operator import LogicalOperator
 from app.models.action_param import ActionParamType, LiteralValue
-from ui import api, sockets
-from ui.models import Action, ActionParam, Agent, Condition, Operator
 
+# setting the page config has to be the first streamlit command
 st.set_page_config(layout="wide")
 
-st.header("Actions")
+from ui import api, sockets  # noqa: E402
+from ui.models import Action, ActionParam, Agent, Condition, Operator  # noqa: E402
+from ui.utils import hide_streamlit_menu  # noqa: E402
+
+hide_streamlit_menu()
 
 
 def save_action(updated_action: dict, triggered_agent: Agent | None) -> None:
+    """Saves the updated action."""
+
     updated_action["triggered_agent_id"] = (
         triggered_agent.id if triggered_agent else None
     )
     updated_action = api.update_action(updated_action)
     if updated_action:
-        # api.get_actions.clear()
+        api.get_actions.clear()
         st.toast("Action saved successfully.", icon=":material/done:")
 
 
 def save_action_param(updated_param: dict) -> None:
+    """Saves the updated action parameter."""
+
     updated_param = api.update_action_param(updated_param)
     if updated_param:
-        # api.get_actions.clear()
+        api.get_actions.clear()
         st.toast("Parameter saved successfully.", icon=":material/done:")
 
 
 @st.dialog("Add action")
 def add_action_dialog():
+    """Renders a dialog to create a new action."""
+
     action_name = st.text_input("Name", help="The name of the action.")
     action_description = st.text_area(
         "Description", help="A description of the action."
@@ -62,7 +71,7 @@ def add_action_dialog():
         }
         created_action = api.create_action(action_dict)
         if created_action:
-            # api.get_actions.clear()
+            api.get_actions.clear()
             st.toast("Action added successfully.", icon=":material/done:")
             st.rerun()
 
@@ -72,6 +81,8 @@ def param_literal_values(
     value: list[LiteralValue] | None = None,
     key: str | None = None,
 ) -> list[LiteralValue] | None:
+    """Renders the literal values input for a parameter."""
+
     literal_values = None
     if param_type == "literal":
         literal_values_text = st.text_input(
@@ -98,11 +109,16 @@ def param_literal_values(
                     "Invalid JSON format for literal values.", icon=":material/error:"
                 )
 
+    if isinstance(literal_values, list) and not literal_values:
+        st.toast("Literal values cannot be empty.", icon=":material/error:")
+
     return literal_values
 
 
 @st.dialog("Add parameter")
 def add_param_dialog(action_id: int) -> None:
+    """Renders a dialog to create a new parameter for an action."""
+
     param_name = st.text_input("Name", help="The name of the parameter.")
     param_description = st.text_area(
         "Description", help="A description of the parameter."
@@ -129,12 +145,14 @@ def add_param_dialog(action_id: int) -> None:
         }
         created_param = api.create_action_param(param_dict)
         if created_param:
-            # api.get_actions.clear()
+            api.get_actions.clear()
             st.toast("Parameter added successfully.", icon=":material/done:")
             st.rerun()
 
 
 def render_action_param(param: ActionParam) -> None:
+    """Renders an action parameter's details."""
+
     with st.container(border=True, key=f"param_{param.id}"):
         form_model = param.to_form_model()
         updated_param = sp.pydantic_input(f"param_{param.id}", form_model)
@@ -146,38 +164,71 @@ def render_action_param(param: ActionParam) -> None:
 
         save_col, delete_col = st.columns([1, 13])
 
-        with save_col:
-            save_param_button = st.button(
-                "Save",
-                disabled=(
-                    (updated_param["type"] == "literal" and not literal_values)
-                    or (
-                        updated_param == form_model.model_dump()
-                        and literal_values == param.literal_values
-                    )
-                    or not updated_param["name"]
-                ),
-                key=f"save_param_{param.id}",
-                icon=":material/save:",
-                type="primary",
-            )
-            if save_param_button:
-                updated_param["literal_values"] = literal_values
-                save_action_param(updated_param)
+        save_button = save_col.button(
+            "Save",
+            disabled=(
+                (updated_param["type"] == "literal" and not literal_values)
+                or (
+                    updated_param == form_model.model_dump()
+                    and literal_values == param.literal_values
+                )
+                or not updated_param["name"]
+            ),
+            key=f"save_param_{param.id}",
+            icon=":material/save:",
+            type="primary",
+        )
+        if save_button:
+            updated_param["literal_values"] = literal_values
+            save_action_param(updated_param)
 
-        with delete_col:
-            delete_param_button = st.button(
-                "Delete", key=f"delete_param_{param.id}", icon=":material/delete:"
-            )
-            if delete_param_button:
-                deleted = api.delete_action_param(param.id)
-                if deleted:
-                    # api.get_actions.clear()
-                    st.toast("Parameter deleted successfully.", icon=":material/done:")
-                    st.rerun()
+        delete_button = delete_col.button(
+            "Delete", key=f"delete_param_{param.id}", icon=":material/delete:"
+        )
+        if delete_button:
+            deleted = api.delete_action_param(param.id)
+            if deleted:
+                api.get_actions.clear()
+                st.toast("Parameter deleted successfully.", icon=":material/done:")
+                st.rerun()
+
+
+def render_action_conditions(action: Action) -> None:
+    """
+    Renders an action's conditions or a button to create
+    new condition tree with a root node only.
+    """
+
+    root = next(
+        (root for root in condition_tree_roots if root.action_id == action.id),
+        None,
+    )
+    if root:
+        render_condition_tree(action.id, root)
+    else:
+        if f"flow_state_{action.id}" not in st.session_state:
+            if st.button(
+                "Create condition tree",
+                key=f"create_condition_tree_{action.id}",
+                icon=":material/add:",
+            ):
+                root = Operator(
+                    parent_id=None,
+                    action_id=action.id,
+                    logical_operator=LogicalOperator.OR,
+                )
+                st.session_state[f"flow_state_{action.id}"] = sf.StreamlitFlowState(
+                    nodes=[root.to_node(node_id=str(uuid4()))],
+                    edges=[],
+                )
+                st.rerun()
+        else:
+            render_condition_tree(action.id, None)
 
 
 def render_action(action: Action) -> None:
+    """Renders an action's details, parameters and conditions."""
+
     with st.expander(action.name):
         updated_action = sp.pydantic_input(
             f"action_{action.id}", action.to_form_model()
@@ -226,70 +277,42 @@ def render_action(action: Action) -> None:
             key=f"show_conditions_{action.id}",
         )
         if show_conditions:
-            root = next(
-                (root for root in condition_tree_roots if root.action_id == action.id),
-                None,
-            )
-            if root:
-                render_condition_tree(action.id, root)
-            else:
-                if f"flow_state_{action.id}" not in st.session_state:
-                    if st.button(
-                        "Create condition tree",
-                        key=f"create_condition_tree_{action.id}",
-                        icon=":material/add:",
-                    ):
-                        root = Operator(
-                            id=0,
-                            root_id=0,
-                            parent_id=None,
-                            action_id=action.id,
-                            logical_operator=LogicalOperator.OR,
-                        )
-                        st.session_state[f"flow_state_{action.id}"] = (
-                            sf.StreamlitFlowState(
-                                nodes=[root.to_node(node_id=str(uuid4()))],
-                                edges=[],
-                            )
-                        )
-                        st.rerun()
-                else:
-                    render_condition_tree(action.id, None)
+            render_action_conditions(action)
 
         save_col, delete_col = st.columns([1, 13])
 
-        with save_col:
-            save_button = st.button(
-                "Save",
-                disabled=(
-                    (
-                        updated_action == action.to_form_model().model_dump()
-                        or not updated_action["name"]
-                    )
-                    and (triggered_agent.id if triggered_agent else None)
-                    == action.triggered_agent_id
-                ),
-                key=f"save_{action.id}",
-                icon=":material/save:",
-                type="primary",
-            )
-            if save_button:
-                save_action(updated_action, triggered_agent)
+        save_button = save_col.button(
+            "Save",
+            disabled=(
+                (
+                    updated_action == action.to_form_model().model_dump()
+                    or not updated_action["name"]
+                )
+                and (triggered_agent.id if triggered_agent else None)
+                == action.triggered_agent_id
+            ),
+            key=f"save_{action.id}",
+            icon=":material/save:",
+            type="primary",
+        )
+        if save_button:
+            save_action(updated_action, triggered_agent)
 
-        with delete_col:
-            delete_button = st.button(
-                "Delete", key=f"delete_{action.id}", icon=":material/delete:"
-            )
-            if delete_button:
-                deleted = api.delete_action(action.id)
-                if deleted:
-                    # api.get_actions.clear()
-                    st.toast("Action deleted successfully.", icon=":material/done:")
-                    st.rerun()
+        delete_button = delete_col.button(
+            "Delete", key=f"delete_{action.id}", icon=":material/delete:"
+        )
+        if delete_button:
+            deleted = api.delete_action(action.id)
+            if deleted:
+                api.get_actions.clear()
+                st.toast("Action deleted successfully.", icon=":material/done:")
+                st.rerun()
 
 
 @st.dialog("Add condition")
 def add_condition_dialog(action_id: int):
+    """Renders a dialog to create a new condition node."""
+
     agent = None
     if st.toggle(
         "Agent variable",
@@ -299,7 +322,7 @@ def add_condition_dialog(action_id: int):
             "Agent",
             options=agents,
             format_func=lambda a: a.name,
-            help="The agent to use for the condition.",
+            help="The agent whose state variable to use for the condition.",
             placeholder="Select an agent",
         )
 
@@ -329,9 +352,6 @@ def add_condition_dialog(action_id: int):
 
     if st.button("Submit", disabled=not state_variable or not expected_value):
         condition = Condition(
-            id=0,
-            root_id=0,
-            parent_id=0,
             state_variable_name=(
                 f"agent-{agent.id}/{state_variable}"
                 if agent
@@ -341,158 +361,174 @@ def add_condition_dialog(action_id: int):
             expected_value=expected_value,
         )
         st.session_state[f"flow_state_{action_id}"].nodes.append(
-            condition.to_node(node_id=str(uuid4()))
+            condition.to_node(node_id=str(uuid4()), agent=agent)
         )
         st.session_state[f"is_saved_{action_id}"] = False
         st.rerun()
 
 
+def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
+    """Renders a dialog to edit a condition node."""
+
+    condition = Condition.model_validate(node.data)
+
+    prefix, state_variable_name = condition.state_variable_name.split("/", 1)
+    agent_id = int(prefix.split("-")[1]) if prefix.startswith("agent") else None
+
+    agent_variable_toggle = st.toggle(
+        "Agent variable",
+        value=agent_id is not None,
+        help="Whether this condition is based on an agent state variable.",
+    )
+    agent = None
+    if agent_variable_toggle:
+        agent = st.selectbox(
+            "Agent",
+            options=agents,
+            format_func=lambda a: a.name,
+            index=(
+                agents.index(next(agent for agent in agents if agent.id == agent_id))
+                if agent_id
+                else 0
+            ),
+            help="The agent whose state variable to use for the condition.",
+            placeholder="Select an agent",
+        )
+        agent_id = agent.id
+
+    is_agent_state = agent_id and agent_variable_toggle
+    state = (
+        sockets.get_agent_state(agent_id)
+        if is_agent_state
+        else sockets.get_global_state()
+    )
+
+    try:
+        index = list(state.keys()).index(state_variable_name)
+    except ValueError:
+        index = 0
+
+    state_variable = st.selectbox(
+        "State variable",
+        options=state.keys(),
+        index=index,
+        help="The name of the state variable.",
+        placeholder="Select a state variable",
+    )
+    comparison = st.selectbox(
+        "Comparison",
+        options=[comparison.value for comparison in ComparisonMethod],
+        index=list(ComparisonMethod).index(condition.comparison),
+        help="The comparison method.",
+        placeholder="Select a comparison",
+    )
+    expected_value = st.text_input(
+        "Expected value",
+        value=condition.expected_value,
+        help=(
+            "The expected value of the state variable.\n\n"
+            "Type is inferred from the value based on JSON format."
+        ),
+    )
+
+    state_variable_name = (
+        f"agent-{agent_id}/{state_variable}"
+        if is_agent_state
+        else f"global/{state_variable}"
+    )
+
+    submit_col, delete_col = st.columns([1, 4])
+
+    submit_button = submit_col.button(
+        "Submit",
+        disabled=(
+            state_variable_name == condition.state_variable_name
+            and expected_value == condition.expected_value
+            and comparison == condition.comparison
+        ),
+    )
+    if submit_button:
+        condition = Condition(
+            id=condition.id,
+            root_id=condition.root_id,
+            parent_id=condition.parent_id,
+            state_variable_name=state_variable_name,
+            comparison=comparison,
+            expected_value=expected_value,
+        )
+        st.session_state[f"flow_state_{action_id}"].nodes[
+            st.session_state[f"flow_state_{action_id}"].nodes.index(node)
+        ] = condition.to_node(
+            node_id=node.id,
+            position=(node.position["x"], node.position["y"]),
+            agent=agent,
+        )
+        st.session_state[f"is_saved_{action_id}"] = False
+        st.session_state.node_edited = True
+        st.rerun()
+
+    if delete_col.button("Delete", icon=":material/delete:"):
+        st.session_state[f"flow_state_{action_id}"].nodes.remove(node)
+        st.session_state[f"is_saved_{action_id}"] = False
+        st.session_state.node_edited = True
+        st.rerun()
+
+
+def edit_operator_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
+    """Renders a dialog to edit an operator node."""
+
+    operator = Operator.model_validate(node.data)
+    logical_operator = st.selectbox(
+        "Logical operator",
+        options=[operator.value for operator in LogicalOperator],
+        index=list(LogicalOperator).index(operator.logical_operator),
+        help="The logical operator.",
+        placeholder="Select a logical operator",
+    )
+
+    submit_col, delete_col = st.columns([1, 4])
+
+    if submit_col.button(
+        "Submit", disabled=logical_operator == operator.logical_operator
+    ):
+        operator = Operator(
+            id=operator.id,
+            root_id=operator.root_id,
+            parent_id=operator.parent_id,
+            action_id=operator.action_id,
+            logical_operator=logical_operator,
+        )
+        st.session_state[f"flow_state_{action_id}"].nodes[
+            st.session_state[f"flow_state_{action_id}"].nodes.index(node)
+        ] = operator.to_node(
+            node_id=node.id, position=(node.position["x"], node.position["y"])
+        )
+        st.session_state[f"is_saved_{action_id}"] = False
+        st.session_state.node_edited = True
+        st.rerun()
+
+    if delete_col.button(
+        "Delete", disabled=operator.is_root(), icon=":material/delete:"
+    ):
+        st.session_state[f"flow_state_{action_id}"].nodes.remove(node)
+        st.session_state[f"is_saved_{action_id}"] = False
+        st.session_state.node_edited = True
+        st.rerun()
+
+
 @st.dialog("Edit node")
 def edit_node_dialog(action_id: int, node: sf.StreamlitFlowNode) -> None:
-    print("Rendering dialog")
+    """Renders a dialog to edit a condition or operator node."""
+
     if node.data["type"] == "condition":
-        condition = Condition.model_validate(node.data)
-
-        prefix, state_variable_name = condition.state_variable_name.split("/", 1)
-        agent_id = int(prefix.split("-")[1]) if prefix.startswith("agent") else None
-        agent_variable_toggle = st.toggle(
-            "Agent variable",
-            value=agent_id is not None,
-            help="Whether this condition is based on an agent state variable.",
-        )
-        if agent_variable_toggle:
-            agent = st.selectbox(
-                "Agent",
-                options=agents,
-                format_func=lambda a: a.name,
-                index=(
-                    agents.index(
-                        next(agent for agent in agents if agent.id == agent_id)
-                    )
-                    if agent_id
-                    else 0
-                ),
-                help="The agent to use for the condition.",
-                placeholder="Select an agent",
-            )
-            agent_id = agent.id
-
-        state = (
-            sockets.get_global_state()
-            if not agent_id and not agent_variable_toggle
-            else sockets.get_agent_state(agent_id)
-        )
-
-        try:
-            index = list(state.keys()).index(state_variable_name)
-        except ValueError:
-            index = 0
-
-        state_variable = st.selectbox(
-            "State variable",
-            options=state.keys(),
-            index=index,
-            help="The name of the state variable.",
-            placeholder="Select a state variable",
-        )
-        comparison = st.selectbox(
-            "Comparison",
-            options=[comparison.value for comparison in ComparisonMethod],
-            index=list(ComparisonMethod).index(condition.comparison),
-            help="The comparison method.",
-            placeholder="Select a comparison",
-        )
-        expected_value = st.text_input(
-            "Expected value",
-            value=condition.expected_value,
-            help=(
-                "The expected value of the state variable.\n\n"
-                "Type is inferred from the value based on JSON format."
-            ),
-        )
-
-        state_variable_name = (
-            f"agent-{agent_id}/{state_variable}"
-            if agent_id and agent_variable_toggle
-            else f"global/{state_variable}"
-        )
-
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button(
-                "Submit",
-                disabled=(
-                    state_variable_name == condition.state_variable_name
-                    and expected_value == condition.expected_value
-                    and comparison == condition.comparison
-                ),
-            ):
-                condition = Condition(
-                    id=condition.id,
-                    root_id=condition.root_id,
-                    parent_id=condition.parent_id,
-                    state_variable_name=state_variable_name,
-                    comparison=comparison,
-                    expected_value=expected_value,
-                )
-                st.session_state[f"flow_state_{action_id}"].nodes[
-                    st.session_state[f"flow_state_{action_id}"].nodes.index(node)
-                ] = condition.to_node(
-                    node_id=node.id, position=(node.position["x"], node.position["y"])
-                )
-                st.session_state[f"is_saved_{action_id}"] = False
-                st.session_state.node_edited = True
-                st.rerun()
-
-        with col2:
-            if st.button("Delete", icon=":material/delete:"):
-                st.session_state[f"flow_state_{action_id}"].nodes.remove(node)
-                st.session_state[f"is_saved_{action_id}"] = False
-                st.session_state.node_edited = True
-                st.rerun()
-
+        edit_condition_node(action_id, node)
     else:
-        operator = Operator.model_validate(node.data)
-        logical_operator = st.selectbox(
-            "Logical operator",
-            options=[operator.value for operator in LogicalOperator],
-            index=list(LogicalOperator).index(operator.logical_operator),
-            help="The logical operator.",
-            placeholder="Select a logical operator",
-        )
-
-        col1, col2 = st.columns([1, 4])
-        with col1:
-            if st.button(
-                "Submit", disabled=logical_operator == operator.logical_operator
-            ):
-                operator = Operator(
-                    id=operator.id,
-                    root_id=operator.root_id,
-                    parent_id=operator.parent_id,
-                    action_id=operator.action_id,
-                    logical_operator=logical_operator,
-                )
-                st.session_state[f"flow_state_{action_id}"].nodes[
-                    st.session_state[f"flow_state_{action_id}"].nodes.index(node)
-                ] = operator.to_node(
-                    node_id=node.id, position=(node.position["x"], node.position["y"])
-                )
-                st.session_state[f"is_saved_{action_id}"] = False
-                st.session_state.node_edited = True
-                st.rerun()
-
-        with col2:
-            if st.button(
-                "Delete", disabled=operator.is_root(), icon=":material/delete:"
-            ):
-                st.session_state[f"flow_state_{action_id}"].nodes.remove(node)
-                st.session_state[f"is_saved_{action_id}"] = False
-                st.session_state.node_edited = True
-                st.rerun()
+        edit_operator_node(action_id, node)
 
 
 def save_node(parent: Operator, node: sf.StreamlitFlowNode) -> Condition | Operator:
+    """Saves a condition or operator node."""
+
     if node.data["type"] == "condition":
         condition = Condition.model_validate(node.data)
         condition.parent_id = parent.id
@@ -511,6 +547,8 @@ def save_node(parent: Operator, node: sf.StreamlitFlowNode) -> Condition | Opera
 def save_operator_children(
     action_id: int, operator: Operator, node: sf.StreamlitFlowNode
 ) -> None:
+    """Recursively saves the children of an operator node."""
+
     flow_state: sf.StreamlitFlowState = st.session_state[f"flow_state_{action_id}"]
 
     children_node_ids = [
@@ -523,23 +561,9 @@ def save_operator_children(
             save_operator_children(action_id, child, child_node)
 
 
-def delete_condition_tree(action_id: int) -> None:
-    root = next(
-        (root for root in condition_tree_roots if root.action_id == action_id),
-        None,
-    )
-    if root is None:
-        return
-
-    deleted = api.delete_condition_tree(root.id)
-    if deleted:
-        # api.get_operators.clear()
-        st.toast("Condition tree deleted successfully.", icon=":material/done:")
-        del st.session_state[f"flow_state_{action_id}"]
-        st.rerun()
-
-
 def save_condition_tree(action_id: int) -> None:
+    """Saves the condition tree of an action."""
+
     root = next(
         (root for root in condition_tree_roots if root.action_id == action_id),
         None,
@@ -547,6 +571,9 @@ def save_condition_tree(action_id: int) -> None:
     if root is not None:
         if not api.delete_condition_tree(root.id):
             return
+
+        api.get_operators.clear()
+        api.get_conditions.clear()
 
     flow_state: sf.StreamlitFlowState = st.session_state[f"flow_state_{action_id}"]
 
@@ -566,9 +593,39 @@ def save_condition_tree(action_id: int) -> None:
     st.session_state[f"is_saved_{action_id}"] = True
 
 
+def delete_condition_tree(action_id: int) -> None:
+    """Deletes the condition tree of an action."""
+
+    root = next(
+        (root for root in condition_tree_roots if root.action_id == action_id),
+        None,
+    )
+    if root is None:
+        return
+
+    deleted = api.delete_condition_tree(root.id)
+    if deleted:
+        api.get_operators.clear()
+        api.get_conditions.clear()
+        st.toast("Condition tree deleted successfully.", icon=":material/done:")
+        del st.session_state[f"flow_state_{action_id}"]
+        st.rerun()
+
+
+def get_agent_for_condition(conditiion: Condition) -> Agent | None:
+    """Returns the agent for a condition."""
+
+    if conditiion.state_variable_name.startswith("global"):
+        return None
+
+    agent_id = int(conditiion.state_variable_name.split("/", 1)[0].split("-")[1])
+    return next((agent for agent in agents if agent.id == agent_id), None)
+
+
 @st.fragment
 def render_condition_tree(action_id: int, root: Operator | None) -> None:
-    print("Rendering tree")
+    """Renders the condition tree of an action."""
+
     if root is not None:
         conditions = [
             condition for condition in all_conditions if condition.root_id == root.id
@@ -582,7 +639,10 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
 
     if f"flow_state_{action_id}" not in st.session_state:
         operator_nodes = [operator.to_node() for operator in operators]
-        condition_nodes = [condition.to_node() for condition in conditions]
+        condition_nodes = [
+            condition.to_node(agent=get_agent_for_condition(condition))
+            for condition in conditions
+        ]
         operator_edges = [
             operator.to_edge() for operator in operators if not operator.is_root()
         ]
@@ -600,68 +660,55 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         st.info(
             "- Add new conditions and operators to the condition tree with the button below.\n"  # noqa: E501
             "- Click on a node to edit its properties or delete it.\n"
-            "- Click on an edge and press backspace to delete it."
+            "- Click on an edge and press backspace to delete it.\n"
+            "- You can evaluate the saved condition tree with the Evaluate button."
         )
         add_col, evaluate_col, evaluation_result_col = st.columns(
             [1, 1, 7], vertical_alignment="center"
         )
-        with add_col:
-            with st.popover(
-                "Add node",
-                icon=":material/add:",
-                help="Add a condition or operator to the flow.",
-            ):
-                c1, c2, c3 = st.columns([1.133, 1.402, 1.301])
+        with add_col.popover(
+            "Add node",
+            icon=":material/add:",
+            help="Add a condition or operator to the flow.",
+        ):
+            condition_col, and_operator_col, or_operator_col = st.columns(
+                [1.133, 1.402, 1.301]
+            )
 
-                with c1:
-                    if st.button("Condition", key=f"add_condition_{action_id}"):
-                        add_condition_dialog(action_id)
+            if condition_col.button("Condition", key=f"add_condition_{action_id}"):
+                add_condition_dialog(action_id)
 
-                with c2:
-                    if st.button("**AND** operator", key=f"add_and_{action_id}"):
-                        operator = Operator(
-                            id=0,
-                            root_id=0,
-                            parent_id=0,
-                            action_id=0,
-                            logical_operator=LogicalOperator.AND,
-                        )
-                        st.session_state[f"flow_state_{action_id}"].nodes.append(
-                            operator.to_node(node_id=str(uuid4()))
-                        )
-                        st.session_state[f"is_saved_{action_id}"] = False
-                        st.rerun()
+            if and_operator_col.button("**AND** operator", key=f"add_and_{action_id}"):
+                operator = Operator(logical_operator=LogicalOperator.AND)
+                st.session_state[f"flow_state_{action_id}"].nodes.append(
+                    operator.to_node(node_id=str(uuid4()))
+                )
+                st.session_state[f"is_saved_{action_id}"] = False
+                st.rerun()
 
-                with c3:
-                    if st.button("**OR** operator", key=f"add_or_{action_id}"):
-                        operator = Operator(
-                            id=-1,
-                            root_id=0,
-                            parent_id=0,
-                            action_id=0,
-                            logical_operator=LogicalOperator.OR,
-                        )
-                        st.session_state[f"flow_state_{action_id}"].nodes.append(
-                            operator.to_node(node_id=str(uuid4()))
-                        )
-                        st.session_state[f"is_saved_{action_id}"] = False
-                        st.rerun()
+            if or_operator_col.button("**OR** operator", key=f"add_or_{action_id}"):
+                operator = Operator(logical_operator=LogicalOperator.OR)
+                st.session_state[f"flow_state_{action_id}"].nodes.append(
+                    operator.to_node(node_id=str(uuid4()))
+                )
+                st.session_state[f"is_saved_{action_id}"] = False
+                st.rerun()
 
-        with evaluate_col:
-            if st.button(
-                "Evaluate",
-                key=f"evaluate_{action_id}",
-                disabled=not st.session_state[f"is_saved_{action_id}"],
-                icon=":material/play_arrow:",
-                help=(
-                    "Evaluate the condition tree."
-                    if st.session_state[f"is_saved_{action_id}"]
-                    else "Save the condition tree before evaluating."
-                ),
-            ):
-                result = api.evaluate_action_conditions(action_id)
-                if result is not None:
-                    st.session_state[f"evaluation_result_{action_id}"] = result
+        evaluate_button = evaluate_col.button(
+            "Evaluate",
+            key=f"evaluate_{action_id}",
+            disabled=not st.session_state[f"is_saved_{action_id}"],
+            icon=":material/play_arrow:",
+            help=(
+                "Evaluate the condition tree."
+                if st.session_state[f"is_saved_{action_id}"]
+                else "Save the condition tree before evaluating."
+            ),
+        )
+        if evaluate_button:
+            result = api.evaluate_action_conditions(action_id)
+            if result is not None:
+                st.session_state[f"evaluation_result_{action_id}"] = result
 
         with evaluation_result_col:
             result = st.session_state.get(f"evaluation_result_{action_id}")
@@ -681,21 +728,20 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         )
 
         save_col, delete_col = st.columns([1, 13])
-        with save_col:
-            if st.button(
-                "Save",
-                key=f"save_condition_{action_id}",
-                icon=":material/save:",
-            ):
-                save_condition_tree(action_id)
 
-        with delete_col:
-            if st.button(
-                "Delete condition tree",
-                key=f"delete_condition_{action_id}",
-                icon=":material/delete:",
-            ):
-                delete_condition_tree(action_id)
+        if save_col.button(
+            "Save",
+            key=f"save_condition_{action_id}",
+            icon=":material/save:",
+        ):
+            save_condition_tree(action_id)
+
+        if delete_col.button(
+            "Delete condition tree",
+            key=f"delete_condition_{action_id}",
+            icon=":material/delete:",
+        ):
+            delete_condition_tree(action_id)
 
     if st.session_state[f"flow_state_{action_id}"].selected_id:
         if "node_edited" in st.session_state and st.session_state.node_edited:
@@ -714,6 +760,8 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
             edit_node_dialog(action_id, node)
 
 
+st.header("Actions")
+
 with st.spinner("Loading..."):
     agents = api.get_agents()
     actions = api.get_actions()
@@ -724,7 +772,6 @@ with st.spinner("Loading..."):
     ]
     for action in actions:
         render_action(action)
-
 
 if st.button("Add action", icon=":material/add:"):
     add_action_dialog()

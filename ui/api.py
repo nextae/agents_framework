@@ -1,3 +1,5 @@
+import os
+
 import requests
 import streamlit as st
 
@@ -10,10 +12,13 @@ from app.models.agent_message import AgentMessage
 from app.models.player import PlayerResponse
 from ui.models import Action, ActionParam, Agent, Condition, Operator, Player
 
-BASE_URL = "http://localhost:8080/api/v1"
+API_HOST = os.getenv("API_HOST", "localhost")
+BASE_URL = f"http://{API_HOST}:8080/api/v1"
 
 
 def error_toast(response: requests.Response) -> None:
+    """Displays an error toast with the response message."""
+
     try:
         st.toast(
             "**Error:**\n" + str(response.json().get("detail")), icon=":material/error:"
@@ -24,6 +29,8 @@ def error_toast(response: requests.Response) -> None:
 
 
 def fetch(method: str, endpoint: str, **kwargs) -> requests.Response | None:
+    """Sends a request to the API."""
+
     try:
         return requests.request(method, BASE_URL + endpoint, **kwargs)
     except requests.ConnectionError:
@@ -37,9 +44,8 @@ def fetch(method: str, endpoint: str, **kwargs) -> requests.Response | None:
 # AGENTS
 
 
-# @st.cache_data(ttl=60)
+@st.cache_data(ttl=10, show_spinner=False)
 def get_agents() -> list[Agent]:
-    print("Fetching agents")
     response = fetch("GET", "/agents")
     if response is None:
         return []
@@ -152,9 +158,8 @@ def remove_action(agent_id: int, action_id: int) -> bool:
     return True
 
 
-# @st.cache_data(ttl=60)
+@st.cache_data(ttl=10, show_spinner=False)
 def get_actions() -> list[Action]:
-    print("Fetching actions")
     response = fetch("GET", "/actions")
     if response is None:
         return []
@@ -266,9 +271,8 @@ def delete_action_param(param_id: int) -> bool:
 # PLAYERS
 
 
-# @st.cache_data(ttl=60)
+@st.cache_data(ttl=10, show_spinner=False)
 def get_players() -> list[Player]:
-    print("Fetching players")
     response = fetch("GET", "/players")
     if response is None:
         return []
@@ -325,8 +329,8 @@ def delete_player(player_id: int) -> bool:
 # CONDITIONS
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def get_conditions() -> list[Condition]:
-    print("Fetching conditions")
     response = fetch("GET", "/conditions/condition")
     if response is None:
         return []
@@ -341,8 +345,8 @@ def get_conditions() -> list[Condition]:
     ]
 
 
+@st.cache_data(ttl=10, show_spinner=False)
 def get_operators() -> list[Operator]:
-    print("Fetching operators")
     response = fetch("GET", "/conditions/operator")
     if response is None:
         return []

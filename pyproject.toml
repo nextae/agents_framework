@@ -2,7 +2,7 @@
 name = "agents-framework"
 requires-python = ">=3.11"
 readme = "README.md"
-version = "0.0.0"
+version = "0.1.0"
 authors = [
     {name = "Karol Wójciak", email = "karolwojciak@student.agh.edu.pl"},
     {name = "Łukasz Zawadzki", email = "lzawadzki@student.agh.edu.pl"},
@@ -16,12 +16,14 @@ dependencies = [
     "pydantic==2.9.2",
     "python-socketio==5.11.4",
     "uvicorn==0.32.0",
-    "psycopg2==2.9.10",
+    "psycopg2-binary==2.9.10",
     "langchain==0.3.4",
     "langchain-openai==0.2.3",
     "alembic==1.13.3",
     "streamlit==1.41.1",
-    "streamlit-pydantic @ git+https://github.com/lukasmasuch/streamlit-pydantic"
+    "streamlit-pydantic==0.6.1rc3",
+    "streamlit-flow-component==1.5.0",
+    "websocket-client==1.8.0",
 ]
 
 [project.optional-dependencies]
@@ -29,7 +31,6 @@ dev = [
     "ruff==0.7.0",
     "black==24.10.0",
     "pre-commit==4.0.1",
-    "websocket-client==1.8.0",  # Needed for the test client in utils/socketio_client.py
 ]
 
 [tool.ruff]
@@ -49,3 +50,6 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "B904",  # allow raising exceptions without from e
 ]
+
+[tool.setuptools]
+py-modules = []
