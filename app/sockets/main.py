@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 from uuid import UUID
 
@@ -5,8 +6,8 @@ import pydantic
 import socketio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
 from app.core.database import Session
+from app.errors.api import ConflictError, NotFoundError
 from app.models import Agent, GlobalState
 from app.models.agent_message import AgentMessage
 from app.services.action_condition import ConditionEvaluationError
@@ -20,6 +21,8 @@ from .models import (
     UpdateAgentStateRequest,
     UpdateStateRequest,
 )
+
+logger = logging.getLogger(__name__)
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
 
@@ -48,8 +51,16 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
             llm_response = await agent.query(
                 request.query, player, global_state.state, db
             )
-        except (NotFoundError, ConflictError, ConditionEvaluationError) as e:
-            await sio.emit("agent_response_error", {"error": str(e)})
+        except ConditionEvaluationError as e:
+            await sio.emit(
+                "agent_response_error", {"error": f"Condition evaluation error: {e}"}
+            )
+            return {"success": False}
+        except Exception as e:
+            logger.exception(e)
+            await sio.emit(
+                "agent_response_error", {"error": f"Internal server error: {e}"}
+            )
             return {"success": False}
 
         response = AgentQueryResponse.from_llm_response(agent, llm_response)
@@ -94,10 +105,12 @@ async def _trigger_agents(
             action.triggered_agent_id, db
         )
         if triggered_agent is None:
-            print(f"Agent with id {action.triggered_agent_id} not found.")
+            logger.warning(f"Agent with id {action.triggered_agent_id} not found.")
             continue
 
-        print(f"Triggering agent {triggered_agent.name} from action {action.name}")
+        logger.debug(
+            f"Triggering agent {triggered_agent.name} from action {action.name}"
+        )
 
         try:
             llm_response = await triggered_agent.query(

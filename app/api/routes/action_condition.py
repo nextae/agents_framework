@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
 from app.core.database import get_db
+from app.errors.api import ConflictError, NotFoundError
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,

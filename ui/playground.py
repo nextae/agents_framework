@@ -30,15 +30,21 @@ def render_message(message: CallerMessage | AgentMessage) -> None:
             avatar="assistant" if isinstance(message.caller, Agent) is None else "user",
         ):
             st.write(f"**{message.caller.name}**")
-            st.write(message.query)
+            if isinstance(message.caller, Player):
+                st.write(message.query)
+            else:
+                st.code(json.dumps(eval(message.query)), language="json")
     else:
         with st.chat_message("ai"):
             st.write(f"**{message.agent.name}**")
             st.write(message.response)
             for action in message.actions:
                 with st.expander(f"{action['name']}"):
-                    for key, value in action["params"].items():
-                        st.write(f"**{key}:** {value}")
+                    if action["params"]:
+                        for key, value in action["params"].items():
+                            st.write(f"**{key}:** {value}")
+                    else:
+                        st.write("*No parameters*")
 
 
 def get_messages(agent: Agent) -> list[CallerMessage | AgentMessage]:
@@ -51,14 +57,7 @@ def get_messages(agent: Agent) -> list[CallerMessage | AgentMessage]:
             if message.caller_player_id is not None
             else next((a for a in agents if a.id == message.caller_agent_id), None)
         )
-        caller_message = CallerMessage(
-            caller=caller.model_dump(),
-            query=(
-                message.query
-                if message.caller_player_id is not None
-                else eval(message.query)["question"]
-            ),
-        )
+        caller_message = CallerMessage(caller=caller.model_dump(), query=message.query)
 
         message_agent = (
             agent
@@ -204,7 +203,7 @@ def render_chat(agent: Agent, player: Player | None) -> None:
                 if action.triggered_agent_id is not None:
                     caller_message = CallerMessage(
                         caller=response_agent.model_dump(),
-                        query=action.params["question"],
+                        query=str(action.params),
                     )
                     render_message(caller_message)
                     st.session_state.messages.append(caller_message)

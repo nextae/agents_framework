@@ -166,11 +166,20 @@ class Condition(BaseModel):
             if not self.is_expected_value_text()
             else f'"{self.expected_value}"'
         )
-        state_text = "Global" if agent is None else f"Agent: {agent.name}"
+        is_valid = (
+            self.state_variable_name.startswith("global")
+            and agent is None
+            or (self.state_variable_name.startswith("agent") and agent is not None)
+        )
+        state_text = (
+            ("Global" if agent is None else f"Agent: {agent.name}")
+            if is_valid
+            else "Agent not found!"
+        )
         state_variable = self.state_variable_name.split("/", 1)[1]
         data["content"] = (
             f"{state_variable} {self.comparison.value} {expected_value}"
-            f'<p style="color: #9FA7BC">{state_text}</p>'
+            f'<p style="color: {"#9FA7BC" if is_valid else "#ED4337"}">{state_text}</p>'
         )
         data["type"] = "condition"
         return sf.StreamlitFlowNode(

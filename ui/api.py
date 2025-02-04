@@ -1,3 +1,4 @@
+import logging
 import os
 
 import requests
@@ -15,6 +16,8 @@ from ui.models import Action, ActionParam, Agent, Condition, Operator, Player
 API_HOST = os.getenv("API_HOST", "localhost")
 BASE_URL = f"http://{API_HOST}:8080/api/v1"
 
+logger = logging.getLogger(__name__)
+
 
 def error_toast(response: requests.Response) -> None:
     """Displays an error toast with the response message."""
@@ -23,7 +26,7 @@ def error_toast(response: requests.Response) -> None:
         st.toast(
             "**Error:**\n" + str(response.json().get("detail")), icon=":material/error:"
         )
-        print(response.json())
+        logger.error(response.json())
     except (AttributeError, ValueError):
         st.toast("**Error:**\n" + str(response.text), icon=":material/error:")
 

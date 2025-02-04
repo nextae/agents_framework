@@ -2,7 +2,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
+from app.errors.api import ConflictError, NotFoundError
 from app.models.action import Action
 from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage

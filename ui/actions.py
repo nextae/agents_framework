@@ -62,12 +62,23 @@ def add_action_dialog():
             help="Optional agent that is triggered by this action.",
             placeholder="Select an agent",
         )
+        st.info(
+            "Make sure to add parameters to actions which trigger other agents.\n\n"
+            "For example a 'question' string parameter for the agent to receive information."  # noqa: E501
+        )
 
     if st.button("Submit", disabled=not action_name):
+        if any(a.name == action_name for a in actions):
+            st.error(
+                "An action with this name already exists!",
+                icon=":material/error:",
+            )
+            return
+
         action_dict = {
             "name": action_name,
             "description": action_description,
-            "triggered_agent_id": triggered_agent.id,
+            "triggered_agent_id": triggered_agent.id if triggered_agent else None,
         }
         created_action = api.create_action(action_dict)
         if created_action:
@@ -255,6 +266,10 @@ def render_action(action: Action) -> None:
                 placeholder="Select an agent",
                 key=f"triggered_agent_{action.id}",
             )
+            st.info(
+                "Make sure to add parameters to actions which trigger other agents.\n\n"
+                "For example a 'question' string parameter for the agent to receive information."  # noqa: E501
+            )
 
         show_parameters = st.toggle(
             "Show parameters",
@@ -375,6 +390,12 @@ def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
     prefix, state_variable_name = condition.state_variable_name.split("/", 1)
     agent_id = int(prefix.split("-")[1]) if prefix.startswith("agent") else None
 
+    current_agent = (
+        next((agent for agent in agents if agent.id == agent_id), None)
+        if agent_id
+        else None
+    )
+
     agent_variable_toggle = st.toggle(
         "Agent variable",
         value=agent_id is not None,
@@ -386,11 +407,7 @@ def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
             "Agent",
             options=agents,
             format_func=lambda a: a.name,
-            index=(
-                agents.index(next(agent for agent in agents if agent.id == agent_id))
-                if agent_id
-                else 0
-            ),
+            index=(agents.index(current_agent) if current_agent else 0),
             help="The agent whose state variable to use for the condition.",
             placeholder="Select an agent",
         )

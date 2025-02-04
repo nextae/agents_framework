@@ -1,14 +1,16 @@
+import sqlalchemy.exc
 from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
+from app.errors.api import ConflictError, NotFoundError
 from app.models.action import (
     Action,
     ActionEvaluationResult,
     ActionRequest,
     ActionUpdateRequest,
 )
+from app.services.action_condition import ConditionEvaluationError
 
 LOAD_OPTIONS = [selectinload(Action.params)]
 
@@ -29,9 +31,13 @@ class ActionService:
                     f"Agent with id {action_request.triggered_agent_id} not found"
                 )
 
-        db.add(action)
-        await db.commit()
-        await db.refresh(action)
+        try:
+            db.add(action)
+            await db.commit()
+            await db.refresh(action)
+        except sqlalchemy.exc.IntegrityError:
+            raise ConflictError(f"Action with name {action.name} already exists")
+
         return action
 
     @staticmethod
@@ -95,6 +101,9 @@ class ActionService:
         if action is None:
             raise NotFoundError(f"Action with id {action_id} not found")
 
-        return ActionEvaluationResult(
-            action_id=action_id, result=await action.evaluate_conditions(db)
-        )
+        try:
+            return ActionEvaluationResult(
+                action_id=action_id, result=await action.evaluate_conditions(db)
+            )
+        except ConditionEvaluationError as e:
+            raise ConflictError(str(e))

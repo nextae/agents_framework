@@ -3,7 +3,8 @@ import json
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
+from app.errors.api import ConflictError, NotFoundError
+from app.errors.conditions import ConditionEvaluationError, StateVariableNotFoundError
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,
@@ -20,14 +21,6 @@ from app.models.action_condition_operator import (
 from app.models.global_state import StateValue
 from app.services.action import ActionService
 from app.services.global_state import GlobalStateService
-
-
-class ConditionEvaluationError(Exception):
-    pass
-
-
-class StateVariableNotFoundError(ConditionEvaluationError):
-    pass
 
 
 class ActionConditionTreeNode:
@@ -110,10 +103,10 @@ class ActionConditionTreeNode:
             agent_id = int(self.state_variable_name.split("/")[0].split("-")[1])
             agent = await AgentService.get_agent_by_id(agent_id, db)
             if agent is None:
-                raise NotFoundError(f"Agent with id {agent_id} not found")
+                raise ConditionEvaluationError(f"Agent with id {agent_id} not found")
             state = agent.state
         else:
-            raise ConflictError(
+            raise ConditionEvaluationError(
                 f"State variable name '{self.state_variable_name}' is not valid"
             )
 

@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
 from app.core.database import get_db
+from app.errors.api import ConflictError, NotFoundError
+from app.errors.conditions import ConditionEvaluationError
 from app.models.action import (
     Action,
     ActionEvaluationResult,
@@ -11,7 +12,6 @@ from app.models.action import (
     ActionUpdateRequest,
 )
 from app.services.action import ActionService
-from app.services.action_condition import ConditionEvaluationError
 
 actions_router = APIRouter(prefix="/actions")
 

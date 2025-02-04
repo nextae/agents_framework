@@ -14,7 +14,7 @@ if [ -z "$POSTGRES_USER" ] || [ -z "$POSTGRES_SERVER" ]; then
   exit 1
 fi
 
-DEFAULT_CONTAINER_NAME="agents_framework-database-1"
+DEFAULT_CONTAINER_NAME="agents-db"
 DEBUG=false
 DATA_ONLY=false
 BACKUP_FILE="backup.sql"

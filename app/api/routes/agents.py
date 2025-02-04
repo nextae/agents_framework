@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
 from app.core.database import get_db
+from app.errors.api import NotFoundError
 from app.models import AgentMessage
 from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequest
 from app.models.agents_actions_match import AgentsActionsMatch

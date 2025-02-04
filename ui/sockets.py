@@ -71,3 +71,4 @@ def query_agent(
             yield response
         elif event == "agent_response_error":
             st.toast(data["error"], icon=":material/error:")
+            return
