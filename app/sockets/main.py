@@ -7,10 +7,9 @@ import socketio
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.core.database import Session
-from app.errors.api import ConflictError, NotFoundError
+from app.errors.conditions import ConditionEvaluationError
 from app.models import Agent, GlobalState
 from app.models.agent_message import AgentMessage
-from app.services.action_condition import ConditionEvaluationError
 from app.services.agent import AgentService
 from app.services.global_state import GlobalStateService
 from app.services.player import PlayerService
@@ -116,8 +115,16 @@ async def _trigger_agents(
             llm_response = await triggered_agent.query(
                 str(action_response.params), agent, global_state.state, db
             )
-        except (NotFoundError, ConflictError, ConditionEvaluationError) as e:
-            await sio.emit("agent_response_error", {"error": str(e)})
+        except ConditionEvaluationError as e:
+            await sio.emit(
+                "agent_response_error", {"error": f"Condition evaluation error: {e}"}
+            )
+            return False
+        except Exception as e:
+            logger.exception(e)
+            await sio.emit(
+                "agent_response_error", {"error": f"Internal server error: {e}"}
+            )
             return False
 
         response = AgentQueryResponse.from_llm_response(triggered_agent, llm_response)
