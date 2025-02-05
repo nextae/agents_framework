@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
-from app.db.database import get_db
+from app.core.database import get_db
+from app.errors.api import NotFoundError
 from app.models.player import Player, PlayerRequest, PlayerResponse, PlayerUpdateRequest
 from app.services.player import PlayerService
 
@@ -39,6 +39,6 @@ async def update_player(
     return await PlayerService.update_player(player_id, player_update, db)
 
 
-@players_router.delete("/{player_id}")
+@players_router.delete("/{player_id}", status_code=204)
 async def delete_player(player_id: int, db: AsyncSession = Depends(get_db)) -> None:
     return await PlayerService.delete_player(player_id, db)

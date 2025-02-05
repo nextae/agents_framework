@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 
 
 class ActionBase(SQLModel):
-    name: str
+    name: str = Field(..., unique=True)
     triggered_agent_id: int | None = None
     description: str | None = None
 
@@ -75,3 +75,8 @@ class ActionUpdateRequest(SQLModel):
 class ActionResponse(ActionBase):
     id: int
     params: list[ActionParamResponse]
+
+
+class ActionEvaluationResult(BaseModel):
+    action_id: int
+    result: bool

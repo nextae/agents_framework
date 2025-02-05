@@ -1,7 +1,7 @@
 from fastapi import HTTPException, Request, Response
 from fastapi.exception_handlers import http_exception_handler
 
-from app.api.errors import ConflictError, NotFoundError
+from app.errors.api import ConflictError, NotFoundError
 
 
 async def not_found_error_handler(request: Request, exc: NotFoundError) -> Response:

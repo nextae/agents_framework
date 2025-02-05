@@ -1,7 +1,10 @@
+import json
+
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError, ConflictError
+from app.errors.api import ConflictError, NotFoundError
+from app.errors.conditions import ConditionEvaluationError, StateVariableNotFoundError
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,
@@ -16,8 +19,8 @@ from app.models.action_condition_operator import (
     NewConditionTreeRequest,
 )
 from app.models.global_state import StateValue
-from app.services.global_state import GlobalStateService
 from app.services.action import ActionService
+from app.services.global_state import GlobalStateService
 
 
 class ActionConditionTreeNode:
@@ -50,54 +53,48 @@ class ActionConditionTreeNode:
         if len(self.children) == 0:
             state_var = await self.__get_state_variable(db)
 
-            if state_var is None:
-                raise KeyError(f"No state variable {self.state_variable_name} found")
-
-            if self.comparison in {
-                ComparisonMethod.GREATER,
-                ComparisonMethod.LESS,
-                ComparisonMethod.AT_LEAST,
-                ComparisonMethod.AT_MOST,
-            }:
-                try:
-                    state_var = float(state_var)
-                    expected_value = float(self.expected_value)
-                except ValueError:
-                    raise TypeError(
-                        f"Comparison '{self.comparison.name}' is not valid for non-numeric values: "  # noqa: E501
-                        f"state_var={state_var}, expected_value={self.expected_value}"
-                    )
-            else:
+            try:
+                expected_value = json.loads(self.expected_value)
+            except json.JSONDecodeError:
                 expected_value = self.expected_value
 
-            if self.comparison == ComparisonMethod.EQUAL:
-                return state_var == expected_value
-            elif self.comparison == ComparisonMethod.NOT_EQUAL:
-                return state_var != expected_value
-            elif self.comparison == ComparisonMethod.GREATER:
-                return state_var > expected_value
-            elif self.comparison == ComparisonMethod.LESS:
-                return state_var < expected_value
-            elif self.comparison == ComparisonMethod.AT_LEAST:
-                return state_var >= expected_value
-            elif self.comparison == ComparisonMethod.AT_MOST:
-                return state_var <= expected_value
+            try:
+                match self.comparison:
+                    case ComparisonMethod.EQUAL:
+                        return state_var == expected_value
+                    case ComparisonMethod.NOT_EQUAL:
+                        return state_var != expected_value
+                    case ComparisonMethod.GREATER:
+                        return state_var > expected_value
+                    case ComparisonMethod.LESS:
+                        return state_var < expected_value
+                    case ComparisonMethod.AT_LEAST:
+                        return state_var >= expected_value
+                    case ComparisonMethod.AT_MOST:
+                        return state_var <= expected_value
+            except TypeError:
+                raise ConditionEvaluationError(
+                    f"Comparison '{self.comparison.name}' is not valid for values: "
+                    f"state_var={state_var}, expected_value={self.expected_value}"
+                )
         else:
             results = [await child.__evaluate(db) for child in self.children]
             if self.logical_operator == LogicalOperator.AND:
                 return all(results)
+
             return any(results)
 
     async def validate_leaf(self, db: AsyncSession) -> bool:
         if self.logical_operator is not None:
             raise ValueError("Node must be a leaf to validate")
+
         try:
             await self.__evaluate(db)
-        except (KeyError, TypeError, ValueError):
+        except ConditionEvaluationError:
             return False
         return True
 
-    async def __get_state_variable(self, db: AsyncSession) -> StateValue | None:
+    async def __get_state_variable(self, db: AsyncSession) -> StateValue:
         from app.services.agent import AgentService
 
         if self.state_variable_name.startswith("global"):
@@ -106,10 +103,10 @@ class ActionConditionTreeNode:
             agent_id = int(self.state_variable_name.split("/")[0].split("-")[1])
             agent = await AgentService.get_agent_by_id(agent_id, db)
             if agent is None:
-                raise NotFoundError(f'Agent with id {agent_id} not found')
+                raise ConditionEvaluationError(f"Agent with id {agent_id} not found")
             state = agent.state
         else:
-            raise ConflictError(
+            raise ConditionEvaluationError(
                 f"State variable name '{self.state_variable_name}' is not valid"
             )
 
@@ -123,10 +120,10 @@ class ActionConditionTreeNode:
                 elif isinstance(current, list):
                     current = current[int(key)]
                 else:
-                    return None  # Unsupported type
+                    raise StateVariableNotFoundError("State variable not found")
             return current
         except (KeyError, IndexError, ValueError, TypeError):
-            return None
+            raise StateVariableNotFoundError("State variable not found")
 
 
 class ActionConditionService:
@@ -240,11 +237,15 @@ class ActionConditionService:
             condition_operator_request
         )
 
-        await ActionConditionService.__check_parent_and_root(condition_operator.parent_id, condition_operator.root_id, db)
+        await ActionConditionService.__check_parent_and_root(
+            condition_operator.parent_id, condition_operator.root_id, db
+        )
 
         action = await ActionService.get_action_by_id(condition_operator.action_id, db)
         if action is None:
-            raise NotFoundError(f"Action with id {condition_operator.action_id} not found")
+            raise NotFoundError(
+                f"Action with id {condition_operator.action_id} not found"
+            )
 
         db.add(condition_operator)
         await db.commit()
@@ -289,7 +290,9 @@ class ActionConditionService:
     ) -> ActionCondition:
         condition = ActionCondition.model_validate(condition_request)
 
-        await ActionConditionService.__check_parent_and_root(condition.parent_id, condition.root_id, db)
+        await ActionConditionService.__check_parent_and_root(
+            condition.parent_id, condition.root_id, db
+        )
 
         if validate:
             if not await condition.validate_condition(db):
@@ -380,7 +383,9 @@ class ActionConditionService:
         if not condition:
             raise NotFoundError(f"Condition with id {condition_id} not found")
 
-        await ActionConditionService.__check_parent_and_root(condition_update.parent_id, condition_update.root_id, db)
+        await ActionConditionService.__check_parent_and_root(
+            condition_update.parent_id, condition_update.root_id, db
+        )
 
         condition_update_data = condition_update.model_dump(exclude_unset=True)
         condition.sqlmodel_update(condition_update_data)
@@ -405,7 +410,9 @@ class ActionConditionService:
         if not operator:
             raise NotFoundError(f"Operator with id {operator_id} not found")
 
-        await ActionConditionService.__check_parent_and_root(operator_update.parent_id, operator_update.root_id, db)
+        await ActionConditionService.__check_parent_and_root(
+            operator_update.parent_id, operator_update.root_id, db
+        )
 
         action = await ActionService.get_action_by_id(operator_update.action_id, db)
         if action is None:
@@ -454,9 +461,13 @@ class ActionConditionService:
         await db.commit()
 
     @staticmethod
-    async def __check_parent_and_root(parent_id: int | None, root_id: int | None, db: AsyncSession) -> None:
+    async def __check_parent_and_root(
+        parent_id: int | None, root_id: int | None, db: AsyncSession
+    ) -> None:
         if parent_id is not None:
-            parent = await ActionConditionService.get_condition_operator_by_id(parent_id, db)
+            parent = await ActionConditionService.get_condition_operator_by_id(
+                parent_id, db
+            )
             if parent is None:
                 raise NotFoundError(f"No operator with id {parent_id} found")
 

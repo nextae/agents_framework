@@ -2,7 +2,7 @@ from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import ConflictError, NotFoundError
+from app.errors.api import ConflictError, NotFoundError
 from app.models.action import Action
 from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage
@@ -130,6 +130,14 @@ class AgentService:
         await db.commit()
         await db.refresh(message)
         return message
+
+    @staticmethod
+    async def get_agent_messages(agent_id: int, db: AsyncSession) -> list[AgentMessage]:
+        agent = await AgentService.get_populated_agent(agent_id, db)
+        if agent is None:
+            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+
+        return agent.conversation_history
 
     @staticmethod
     async def delete_agent_messages(agent_id: int, db: AsyncSession) -> None:

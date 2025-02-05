@@ -15,7 +15,7 @@ DATABASE_URL = (
     f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
 )
 
-async_engine = create_async_engine(DATABASE_URL, echo=True, poolclass=NullPool)
+async_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
 
 Session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 

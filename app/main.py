@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from socketio import ASGIApp
 
-from app.api.errors import ConflictError, NotFoundError
 from app.api.exception_handlers import conflict_error_handler, not_found_error_handler
 from app.api.main import api_router
+from app.errors.api import ConflictError, NotFoundError
 from app.sockets.main import sio
 
 load_dotenv()

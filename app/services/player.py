@@ -1,7 +1,7 @@
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.api.errors import NotFoundError
+from app.errors.api import NotFoundError
 from app.models.player import Player, PlayerRequest, PlayerUpdateRequest
 
 
