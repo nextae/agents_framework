@@ -9,13 +9,13 @@ from app.models.action_condition import ComparisonMethod
 from app.models.action_condition_operator import LogicalOperator
 from app.models.action_param import ActionParamType, LiteralValue
 
-# setting the page config has to be the first streamlit command
 st.set_page_config(layout="wide")
 
 from ui import api, sockets  # noqa: E402
 from ui.models import Action, ActionParam, Agent, Condition, Operator  # noqa: E402
-from ui.utils import hide_streamlit_menu  # noqa: E402
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in  # noqa: E402
 
+redirect_if_not_logged_in()
 hide_streamlit_menu()
 
 
@@ -271,11 +271,7 @@ def render_action(action: Action) -> None:
                 "For example a 'question' string parameter for the agent to receive information."  # noqa: E501
             )
 
-        show_parameters = st.toggle(
-            "Show parameters",
-            help="Whether to show the parameters of the action.",
-            key=f"show_params_{action.id}",
-        )
+        show_parameters = st.toggle("Show parameters", key=f"show_params_{action.id}")
         if show_parameters:
             for param in action.params:
                 render_action_param(param)
@@ -287,9 +283,7 @@ def render_action(action: Action) -> None:
                 add_param_dialog(action.id)
 
         show_conditions = st.toggle(
-            "Show conditions",
-            help="Whether to show the conditions of the action.",
-            key=f"show_conditions_{action.id}",
+            "Show conditions", key=f"show_conditions_{action.id}"
         )
         if show_conditions:
             render_action_conditions(action)

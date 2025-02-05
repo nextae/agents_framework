@@ -1,12 +1,7 @@
-from enum import Enum
-
 from sqlalchemy import Enum as SAEnum
 from sqlmodel import Column, Field, SQLModel
 
-
-class LogicalOperator(str, Enum):
-    AND = "AND"
-    OR = "OR"
+from app.models.action_condition import ActionConditionTreeNode, LogicalOperator
 
 
 class ActionConditionOperatorBase(SQLModel):
@@ -26,8 +21,6 @@ class ActionConditionOperator(ActionConditionOperatorBase, table=True):
     )
 
     def to_tree_node(self):
-        from app.services.action_condition import ActionConditionTreeNode
-
         return ActionConditionTreeNode(self.id, self.logical_operator, None, None, None)
 
     def is_root(self) -> bool:

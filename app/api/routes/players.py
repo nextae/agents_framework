@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_db
+from app.api.dependencies import get_db, validate_token
 from app.errors.api import NotFoundError
 from app.models.player import Player, PlayerRequest, PlayerResponse, PlayerUpdateRequest
 from app.services.player import PlayerService
 
-players_router = APIRouter(prefix="/players")
+players_router = APIRouter(prefix="/players", dependencies=[Depends(validate_token)])
 
 
 @players_router.get("", response_model=list[PlayerResponse])

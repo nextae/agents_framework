@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_db
+from app.api.dependencies import get_db, validate_token
 from app.errors.api import ConflictError, NotFoundError
 from app.models.action_condition import (
     ActionCondition,
@@ -18,7 +18,9 @@ from app.models.action_condition_operator import (
 )
 from app.services.action_condition import ActionConditionService
 
-condition_router = APIRouter(prefix="/conditions")
+condition_router = APIRouter(
+    prefix="/conditions", dependencies=[Depends(validate_token)]
+)
 
 
 @condition_router.post(

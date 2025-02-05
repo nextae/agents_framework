@@ -24,10 +24,4 @@ app.include_router(api_router)
 app.add_exception_handler(NotFoundError, not_found_error_handler)
 app.add_exception_handler(ConflictError, conflict_error_handler)
 
-
-@app.get("/")
-async def root() -> dict[str, str]:
-    return {"message": "Hello World"}
-
-
 socket_app = ASGIApp(sio, app)
