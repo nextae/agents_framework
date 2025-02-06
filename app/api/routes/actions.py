@@ -43,7 +43,7 @@ async def get_action_by_id(
     return action
 
 
-@actions_router.put("/{action_id}", response_model=ActionResponse)
+@actions_router.patch("/{action_id}", response_model=ActionResponse)
 async def update_action(
     action_id: int,
     action_update: ActionUpdateRequest,

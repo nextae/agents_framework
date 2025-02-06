@@ -106,7 +106,7 @@ async def get_action_condition_operator_by_id(
     return operator
 
 
-@condition_router.put(
+@condition_router.patch(
     "/condition/{condition_id}", response_model=ActionConditionResponse
 )
 async def update_action_condition_by_id(
@@ -119,7 +119,7 @@ async def update_action_condition_by_id(
     )
 
 
-@condition_router.put(
+@condition_router.patch(
     "/operator/{operator_id}", response_model=ActionConditionOperatorResponse
 )
 async def update_action_condition_operator_by_id(
@@ -156,7 +156,7 @@ async def delete_tree_by_root_id(root_id: int, db: AsyncSession = Depends(get_db
     return await ActionConditionService.delete_condition_operator(root_id, db, True)
 
 
-@condition_router.put("/condition_tree/assign")
+@condition_router.post("/condition_tree/assign")
 async def assign_tree_to_action(
     root_id: int, action_id: int, db: AsyncSession = Depends(get_db)
 ) -> tuple[int, int]:

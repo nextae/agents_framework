@@ -36,7 +36,7 @@ async def create_agent(
     )
 
 
-@agents_router.put("/{agent_id}", response_model=AgentResponse)
+@agents_router.patch("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
     agent_id: int, agent_update: AgentUpdateRequest, db: AsyncSession = Depends(get_db)
 ) -> Agent:

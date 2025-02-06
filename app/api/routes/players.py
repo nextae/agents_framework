@@ -30,7 +30,7 @@ async def create_player(
     return await PlayerService.create_player(player_create, db)
 
 
-@players_router.put("/{player_id}", response_model=PlayerResponse)
+@players_router.patch("/{player_id}", response_model=PlayerResponse)
 async def update_player(
     player_id: int,
     player_update: PlayerUpdateRequest,

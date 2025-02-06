@@ -124,7 +124,7 @@ def create_agent(agent_dict: dict) -> Agent | None:
 
 
 def update_agent(agent_dict: dict) -> Agent | None:
-    response = fetch("PUT", f"/agents/{agent_dict['id']}", json=agent_dict)
+    response = fetch("PATCH", f"/agents/{agent_dict['id']}", json=agent_dict)
     if response is None:
         return None
 
@@ -226,7 +226,7 @@ def get_actions() -> list[Action]:
 
 
 def update_action(action_dict: dict) -> Action | None:
-    response = fetch("PUT", f"/actions/{action_dict['id']}", json=action_dict)
+    response = fetch("PATCH", f"/actions/{action_dict['id']}", json=action_dict)
     if response is None:
         return None
 
@@ -291,7 +291,7 @@ def create_action_param(param_dict: dict) -> ActionParam | None:
 
 
 def update_action_param(param_dict: dict) -> ActionParam | None:
-    response = fetch("PUT", f"/params/{param_dict['id']}", json=param_dict)
+    response = fetch("PATCH", f"/params/{param_dict['id']}", json=param_dict)
     if response is None:
         return None
 
@@ -351,7 +351,7 @@ def create_player(player_dict: dict) -> Player | None:
 
 
 def update_player(player_dict: dict) -> Player | None:
-    response = fetch("PUT", f"/players/{player_dict['id']}", json=player_dict)
+    response = fetch("PATCH", f"/players/{player_dict['id']}", json=player_dict)
     if response is None:
         return None
 

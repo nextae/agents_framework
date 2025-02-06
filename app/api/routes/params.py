@@ -32,7 +32,7 @@ async def get_action_param_by_id(
     return param
 
 
-@params_router.put("/{action_param_id}", response_model=ActionParamResponse)
+@params_router.patch("/{action_param_id}", response_model=ActionParamResponse)
 async def update_action_param(
     action_param_id: int,
     action_param_update: ActionParamUpdateRequest,
