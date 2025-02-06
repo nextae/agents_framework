@@ -1,4 +1,3 @@
-from collections.abc import AsyncGenerator
 from os import getenv
 
 from dotenv import load_dotenv
@@ -18,8 +17,3 @@ DATABASE_URL = (
 async_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)
 
 Session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
-
-
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    async with Session() as session:
-        yield session

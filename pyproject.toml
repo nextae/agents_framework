@@ -20,6 +20,8 @@ dependencies = [
     "langchain==0.3.4",
     "langchain-openai==0.2.3",
     "alembic==1.13.3",
+    "pyjwt==2.10.1",
+    "python-multipart==0.0.20",
     "streamlit==1.41.1",
     "streamlit-pydantic==0.6.1rc3",
     "streamlit-flow-component==1.5.0",

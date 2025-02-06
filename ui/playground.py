@@ -2,13 +2,13 @@ import json
 
 import streamlit as st
 
-# setting the page config has to be the first streamlit command
 st.set_page_config(layout="wide")
 
 from ui import api, sockets  # noqa: E402
 from ui.models import Agent, AgentMessage, CallerMessage, Player  # noqa: E402
-from ui.utils import hide_streamlit_menu  # noqa: E402
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in  # noqa: E402
 
+redirect_if_not_logged_in()
 hide_streamlit_menu()
 
 if "edit_mode_global_state" not in st.session_state:

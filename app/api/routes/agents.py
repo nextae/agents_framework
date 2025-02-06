@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_db
+from app.api.dependencies import get_db, validate_token
 from app.errors.api import NotFoundError
 from app.models import AgentMessage
 from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequest
 from app.models.agents_actions_match import AgentsActionsMatch
 from app.services.agent import AgentService
 
-agents_router = APIRouter(prefix="/agents")
+agents_router = APIRouter(prefix="/agents", dependencies=[Depends(validate_token)])
 
 
 @agents_router.get("", response_model=list[AgentResponse])
@@ -36,7 +36,7 @@ async def create_agent(
     )
 
 
-@agents_router.put("/{agent_id}", response_model=AgentResponse)
+@agents_router.patch("/{agent_id}", response_model=AgentResponse)
 async def update_agent(
     agent_id: int, agent_update: AgentUpdateRequest, db: AsyncSession = Depends(get_db)
 ) -> Agent:

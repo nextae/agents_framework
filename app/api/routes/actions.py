@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_db
+from app.api.dependencies import get_db, validate_token
 from app.errors.api import ConflictError, NotFoundError
 from app.errors.conditions import ConditionEvaluationError
 from app.models.action import (
@@ -13,7 +13,7 @@ from app.models.action import (
 )
 from app.services.action import ActionService
 
-actions_router = APIRouter(prefix="/actions")
+actions_router = APIRouter(prefix="/actions", dependencies=[Depends(validate_token)])
 
 
 @actions_router.post("", status_code=201)
@@ -43,7 +43,7 @@ async def get_action_by_id(
     return action
 
 
-@actions_router.put("/{action_id}", response_model=ActionResponse)
+@actions_router.patch("/{action_id}", response_model=ActionResponse)
 async def update_action(
     action_id: int,
     action_update: ActionUpdateRequest,

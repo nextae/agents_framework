@@ -4,13 +4,13 @@ from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.errors.api import ConflictError, NotFoundError
+from app.errors.conditions import ConditionEvaluationError
 from app.models.action import (
     Action,
     ActionEvaluationResult,
     ActionRequest,
     ActionUpdateRequest,
 )
-from app.services.action_condition import ConditionEvaluationError
 
 LOAD_OPTIONS = [selectinload(Action.params)]
 

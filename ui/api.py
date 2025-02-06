@@ -1,5 +1,6 @@
 import logging
 import os
+from urllib.parse import urlencode
 
 import requests
 import streamlit as st
@@ -34,14 +35,58 @@ def error_toast(response: requests.Response) -> None:
 def fetch(method: str, endpoint: str, **kwargs) -> requests.Response | None:
     """Sends a request to the API."""
 
+    headers = kwargs.pop("headers", {})
+    if not headers and st.session_state.access_token is not None:
+        headers["Authorization"] = f"Bearer {st.session_state.access_token}"
+
     try:
-        return requests.request(method, BASE_URL + endpoint, **kwargs)
+        response = requests.request(
+            method, BASE_URL + endpoint, headers=headers, **kwargs
+        )
     except requests.ConnectionError:
         st.toast(
             "**Error:**\nCould not connect to the server.",
             icon=":material/error:",
         )
         return None
+
+    if st.session_state.access_token and response.status_code == 401:
+        st.session_state.access_token = None
+        st.session_state.session_expired = True
+        login_page = st.Page("login.py", title="Login", icon=":material/lock:")
+        st.switch_page(login_page)
+
+    return response
+
+
+# AUTH
+
+
+def login(username: str, password: str) -> bool:
+    payload = {
+        "grant_type": "password",
+        "username": username,
+        "password": password,
+    }
+
+    response = fetch(
+        "POST",
+        "/login",
+        data=urlencode(payload),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    if response is None:
+        return False
+
+    if response.status_code != 200:
+        if response.status_code != 401:
+            error_toast(response)
+        return False
+
+    data = response.json()
+    st.session_state.access_token = data["access_token"]
+
+    return True
 
 
 # AGENTS
@@ -79,7 +124,7 @@ def create_agent(agent_dict: dict) -> Agent | None:
 
 
 def update_agent(agent_dict: dict) -> Agent | None:
-    response = fetch("PUT", f"/agents/{agent_dict['id']}", json=agent_dict)
+    response = fetch("PATCH", f"/agents/{agent_dict['id']}", json=agent_dict)
     if response is None:
         return None
 
@@ -181,7 +226,7 @@ def get_actions() -> list[Action]:
 
 
 def update_action(action_dict: dict) -> Action | None:
-    response = fetch("PUT", f"/actions/{action_dict['id']}", json=action_dict)
+    response = fetch("PATCH", f"/actions/{action_dict['id']}", json=action_dict)
     if response is None:
         return None
 
@@ -246,7 +291,7 @@ def create_action_param(param_dict: dict) -> ActionParam | None:
 
 
 def update_action_param(param_dict: dict) -> ActionParam | None:
-    response = fetch("PUT", f"/params/{param_dict['id']}", json=param_dict)
+    response = fetch("PATCH", f"/params/{param_dict['id']}", json=param_dict)
     if response is None:
         return None
 
@@ -306,7 +351,7 @@ def create_player(player_dict: dict) -> Player | None:
 
 
 def update_player(player_dict: dict) -> Player | None:
-    response = fetch("PUT", f"/players/{player_dict['id']}", json=player_dict)
+    response = fetch("PATCH", f"/players/{player_dict['id']}", json=player_dict)
     if response is None:
         return None
 

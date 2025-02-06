@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import get_db
+from app.api.dependencies import get_db, validate_token
 from app.errors.api import NotFoundError
 from app.models.action_param import (
     ActionParam,
@@ -11,7 +11,7 @@ from app.models.action_param import (
 )
 from app.services.action_param import ActionParamService
 
-params_router = APIRouter(prefix="/params")
+params_router = APIRouter(prefix="/params", dependencies=[Depends(validate_token)])
 
 
 @params_router.post("", status_code=201, response_model=ActionParamResponse)
@@ -32,7 +32,7 @@ async def get_action_param_by_id(
     return param
 
 
-@params_router.put("/{action_param_id}", response_model=ActionParamResponse)
+@params_router.patch("/{action_param_id}", response_model=ActionParamResponse)
 async def update_action_param(
     action_param_id: int,
     action_param_update: ActionParamUpdateRequest,
