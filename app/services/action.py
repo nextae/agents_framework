@@ -79,9 +79,19 @@ class ActionService:
 
     @staticmethod
     async def delete_action(action_id: int, db: AsyncSession) -> None:
+        from app.services.action_condition import ActionConditionService
+
         action = await ActionService.get_action_by_id(action_id, db)
         if not action:
             raise NotFoundError(f"Action with id {action_id} not found")
+
+        root_operator = await ActionConditionService.try_get_root_for_action_id(
+            action_id, db
+        )
+        if root_operator is not None:
+            await ActionConditionService.delete_condition_operator(
+                root_operator.id, db, True
+            )
 
         await db.delete(action)
         await db.commit()
