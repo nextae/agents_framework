@@ -5,7 +5,6 @@ from typing import Any
 import socketio
 import streamlit as st
 from socketio import exceptions
-from socketio.exceptions import TimeoutError as SocketIOTimeoutError
 
 from app.sockets.models import AgentQueryResponse
 from ui.utils import redirect_if_not_logged_in
@@ -67,7 +66,7 @@ def query_agent(
     while True:
         try:
             event, data = client.receive(timeout=20)
-        except SocketIOTimeoutError:
+        except exceptions.TimeoutError:
             st.toast("Query timed out.", icon=":material/error:")
             return
 
