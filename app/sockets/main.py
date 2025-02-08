@@ -7,6 +7,7 @@ import socketio
 from socketio import exceptions
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.auth import decode_access_token
 from app.core.database import Session
 from app.errors.conditions import ConditionEvaluationError
 from app.models import Agent, GlobalState
@@ -15,7 +16,6 @@ from app.services.agent import AgentService
 from app.services.global_state import GlobalStateService
 from app.services.player import PlayerService
 
-from ..core.auth import decode_access_token
 from .models import (
     AgentQueryRequest,
     AgentQueryResponse,
