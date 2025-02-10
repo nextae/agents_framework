@@ -33,7 +33,9 @@ def render_message(message: CallerMessage | AgentMessage) -> None:
             if isinstance(message.caller, Player):
                 st.write(message.query)
             else:
-                st.code(json.dumps(eval(message.query)), language="json")
+                query_dict = eval(message.query)
+                for param_name, value in query_dict.items():
+                    st.write(f"**{param_name}:** {value}")
     else:
         with st.chat_message("ai"):
             st.write(f"**{message.agent.name}**")
@@ -41,8 +43,8 @@ def render_message(message: CallerMessage | AgentMessage) -> None:
             for action in message.actions:
                 with st.expander(f"{action['name']}"):
                     if action["params"]:
-                        for key, value in action["params"].items():
-                            st.write(f"**{key}:** {value}")
+                        for param_name, value in action["params"].items():
+                            st.write(f"**{param_name}:** {value}")
                     else:
                         st.write("*No parameters*")
 
