@@ -74,3 +74,7 @@ class UpdateStateRequest(BaseModel):
 class UpdateAgentStateRequest(BaseModel):
     agent_id: int
     state: State
+
+
+class AuthPayload(BaseModel):
+    access_token: str

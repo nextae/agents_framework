@@ -4,8 +4,10 @@ from uuid import UUID
 
 import pydantic
 import socketio
+from socketio import exceptions
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.core.auth import decode_access_token
 from app.core.database import Session
 from app.errors.conditions import ConditionEvaluationError
 from app.models import Agent, GlobalState
@@ -17,6 +19,7 @@ from app.services.player import PlayerService
 from .models import (
     AgentQueryRequest,
     AgentQueryResponse,
+    AuthPayload,
     UpdateAgentStateRequest,
     UpdateStateRequest,
 )
@@ -24,6 +27,25 @@ from .models import (
 logger = logging.getLogger(__name__)
 
 sio = socketio.AsyncServer(async_mode="asgi", cors_allowed_origins="*")
+
+
+@sio.on("connect")
+async def authenticate(
+    sid: str, _environ: dict[str, Any], auth: dict[str, str]
+) -> None:
+    """Handles connection and authentication of a client."""
+
+    try:
+        auth_payload = AuthPayload.model_validate(auth)
+    except pydantic.ValidationError:
+        logger.info(f"Socket client {sid} provided invalid auth payload")
+        raise exceptions.ConnectionRefusedError("Invalid auth payload")
+
+    if decode_access_token(auth_payload.access_token) is None:
+        logger.info(f"Socket client {sid} provided invalid or expired access token")
+        raise exceptions.ConnectionRefusedError("Invalid or expired access token")
+
+    logger.info(f"Socket client connected: {sid}")
 
 
 @sio.on("query_agent")
