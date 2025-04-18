@@ -13,10 +13,11 @@ st.set_page_config(layout="wide")
 
 from ui import api, sockets  # noqa: E402
 from ui.models import Action, ActionParam, Agent, Condition, Operator  # noqa: E402
-from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in  # noqa: E402
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, fix_horizontal_buttons  # noqa: E402
 
 redirect_if_not_logged_in()
 hide_streamlit_menu()
+fix_horizontal_buttons()
 
 
 def save_action(updated_action: dict, triggered_agent: Agent | None) -> None:
@@ -173,7 +174,7 @@ def render_action_param(param: ActionParam) -> None:
             key=f"literal_values_{param.id}",
         )
 
-        save_col, delete_col = st.columns([1, 13])
+        save_col, delete_col = st.columns(2)
 
         save_button = save_col.button(
             "Save",
@@ -288,7 +289,7 @@ def render_action(action: Action) -> None:
         if show_conditions:
             render_action_conditions(action)
 
-        save_col, delete_col = st.columns([1, 13])
+        save_col, delete_col = st.columns(2)
 
         save_button = save_col.button(
             "Save",
@@ -448,7 +449,7 @@ def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
         else f"global/{state_variable}"
     )
 
-    submit_col, delete_col = st.columns([1, 4])
+    submit_col, delete_col = st.columns(2)
 
     submit_button = submit_col.button(
         "Submit",
@@ -497,7 +498,7 @@ def edit_operator_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
         placeholder="Select a logical operator",
     )
 
-    submit_col, delete_col = st.columns([1, 4])
+    submit_col, delete_col = st.columns(2)
 
     if submit_col.button(
         "Submit", disabled=logical_operator == operator.logical_operator
@@ -675,16 +676,14 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
             "- You can evaluate the saved condition tree with the Evaluate button."
         )
         add_col, evaluate_col, evaluation_result_col = st.columns(
-            [1, 1, 7], vertical_alignment="center"
+            3, vertical_alignment="center"
         )
         with add_col.popover(
             "Add node",
             icon=":material/add:",
             help="Add a condition or operator to the flow.",
         ):
-            condition_col, and_operator_col, or_operator_col = st.columns(
-                [1.133, 1.402, 1.301]
-            )
+            condition_col, and_operator_col, or_operator_col = st.columns(3)
 
             if condition_col.button("Condition", key=f"add_condition_{action_id}"):
                 add_condition_dialog(action_id)
@@ -738,7 +737,7 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
             animate_new_edges=True,
         )
 
-        save_col, delete_col = st.columns([1, 13])
+        save_col, delete_col = st.columns(2)
 
         if save_col.button(
             "Save",

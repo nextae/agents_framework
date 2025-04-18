@@ -3,12 +3,13 @@ import streamlit_pydantic as sp
 
 from ui import api
 from ui.models import Action, Agent
-from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, fix_horizontal_buttons
 
 st.set_page_config(layout="wide")
 
 redirect_if_not_logged_in()
 hide_streamlit_menu()
+fix_horizontal_buttons()
 
 
 def save_agent(
@@ -100,7 +101,7 @@ def render_agent(agent: Agent) -> None:
             key=f"actions_{agent.id}",
         )
 
-        save_col, delete_col = st.columns([1, 13])
+        save_col, delete_col = st.columns(2)
 
         save_button = save_col.button(
             "Save",

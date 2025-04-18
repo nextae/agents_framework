@@ -3,12 +3,13 @@ import streamlit_pydantic as sp
 
 from ui import api
 from ui.models import Player
-from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, fix_horizontal_buttons
 
 st.set_page_config(layout="wide")
 
 redirect_if_not_logged_in()
 hide_streamlit_menu()
+fix_horizontal_buttons()
 
 
 @st.dialog("Add player")
@@ -39,7 +40,7 @@ def render_player(player: Player) -> None:
     with st.expander(player.name):
         updated_player = sp.pydantic_input(f"player_{player.id}", player)
 
-        save_col, delete_col = st.columns([1, 13])
+        save_col, delete_col = st.columns(2)
 
         save_button = save_col.button(
             "Save",
