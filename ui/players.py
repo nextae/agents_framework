@@ -3,13 +3,13 @@ import streamlit_pydantic as sp
 
 from ui import api
 from ui.models import Player
-from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, fix_horizontal_buttons
+from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, set_horizontal_buttons_width
 
 st.set_page_config(layout="wide")
 
 redirect_if_not_logged_in()
 hide_streamlit_menu()
-fix_horizontal_buttons()
+set_horizontal_buttons_width()
 
 
 @st.dialog("Add player")

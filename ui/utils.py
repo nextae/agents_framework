@@ -18,7 +18,7 @@ def hide_streamlit_menu() -> None:
     )
 
 
-def fix_horizontal_buttons() -> None:
+def set_horizontal_buttons_width() -> None:
     st.markdown(
         """
         <style>
