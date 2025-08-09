@@ -95,7 +95,7 @@ def render_state() -> None:
             label_visibility="collapsed",
         )
 
-        save_col, cancel_col = st.columns([1, 2.7])
+        save_col, cancel_col = st.columns(2)
 
         if save_col.button("Save", key="save_global_state", icon=":material/save:"):
             try:
