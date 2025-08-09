@@ -17,19 +17,20 @@ First of all, you need to create a `.env` file in the root directory of the proj
 You can use the `.env.example` file as a template.
 
 #### Locally:
-1. Install requirements
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/)
+2. Install requirements
     ```bash
-    pip install .
+    uv sync
     ```
-2. Start the API:
+3. Start the API:
     ```bash
-    uvicorn app.main:socket_app --reload
+    uv run uvicorn app.main:socket_app --reload
     ```
-3. Start the UI:
+4. Start the UI:
    ```bash
-   python3 -m streamlit run ui/main.py
+   uv run -m streamlit run ui/main.py
    ```
-4. The app is available on:
+5. The app is available on:
    - UI: http://127.0.0.1:8501
    - API: http://127.0.0.1:8000
 
@@ -56,7 +57,7 @@ You can use the `.env.example` file as a template.
 ### Development
 1. Install the dev dependencies
     ```bash
-    pip install .[dev]
+    uv sync --extra dev
     ```
 2. Setup pre-commit
     ```bash

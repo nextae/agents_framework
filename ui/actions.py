@@ -13,7 +13,11 @@ st.set_page_config(layout="wide")
 
 from ui import api, sockets  # noqa: E402
 from ui.models import Action, ActionParam, Agent, Condition, Operator  # noqa: E402
-from ui.utils import hide_streamlit_menu, redirect_if_not_logged_in, set_horizontal_buttons_width  # noqa: E402
+from ui.utils import (  # noqa: E402
+    hide_streamlit_menu,
+    redirect_if_not_logged_in,
+    set_horizontal_buttons_width,
+)
 
 redirect_if_not_logged_in()
 hide_streamlit_menu()
