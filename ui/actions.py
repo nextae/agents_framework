@@ -381,6 +381,16 @@ def add_condition_dialog(action_id: int):
         st.rerun()
 
 
+def _get_node_index_by_id(action_id: int, node_id: str) -> int:
+    """Returns the index of a node by its ID in the flow state."""
+
+    return next(
+        i
+        for i, n in enumerate(st.session_state[f"flow_state_{action_id}"].nodes)
+        if n.id == node_id
+    )
+
+
 def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
     """Renders a dialog to edit a condition node."""
 
@@ -473,7 +483,7 @@ def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
             expected_value=expected_value,
         )
         st.session_state[f"flow_state_{action_id}"].nodes[
-            st.session_state[f"flow_state_{action_id}"].nodes.index(node)
+            _get_node_index_by_id(action_id, node.id)
         ] = condition.to_node(
             node_id=node.id,
             position=(node.position["x"], node.position["y"]),
@@ -515,7 +525,7 @@ def edit_operator_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
             logical_operator=logical_operator,
         )
         st.session_state[f"flow_state_{action_id}"].nodes[
-            st.session_state[f"flow_state_{action_id}"].nodes.index(node)
+            _get_node_index_by_id(action_id, node.id)
         ] = operator.to_node(
             node_id=node.id, position=(node.position["x"], node.position["y"])
         )
@@ -561,11 +571,9 @@ def save_node(parent: Operator, node: sf.StreamlitFlowNode) -> Condition | Opera
 
 
 def save_operator_children(
-    action_id: int, operator: Operator, node: sf.StreamlitFlowNode
+    flow_state: sf.StreamlitFlowState, operator: Operator, node: sf.StreamlitFlowNode
 ) -> None:
     """Recursively saves the children of an operator node."""
-
-    flow_state: sf.StreamlitFlowState = st.session_state[f"flow_state_{action_id}"]
 
     children_node_ids = [
         edge.target for edge in flow_state.edges if edge.source == node.id
@@ -574,7 +582,7 @@ def save_operator_children(
     for child_node in children_nodes:
         child = save_node(operator, child_node)
         if child_node.data["type"] == "operator":
-            save_operator_children(action_id, child, child_node)
+            save_operator_children(flow_state, child, child_node)
 
 
 def save_condition_tree(action_id: int) -> None:
@@ -604,9 +612,15 @@ def save_condition_tree(action_id: int) -> None:
     if not root:
         return
 
-    save_operator_children(action_id, root, root_node)
+    save_operator_children(flow_state, root, root_node)
+    api.get_operators.clear()
+    api.get_conditions.clear()
     st.toast("Condition tree saved successfully.", icon=":material/done:")
     st.session_state[f"is_saved_{action_id}"] = True
+    if f"evaluation_result_{action_id}" in st.session_state:
+        del st.session_state[f"evaluation_result_{action_id}"]
+
+    st.rerun()
 
 
 def delete_condition_tree(action_id: int) -> None:
@@ -625,6 +639,10 @@ def delete_condition_tree(action_id: int) -> None:
         api.get_conditions.clear()
         st.toast("Condition tree deleted successfully.", icon=":material/done:")
         del st.session_state[f"flow_state_{action_id}"]
+        if f"is_saved_{action_id}" in st.session_state:
+            del st.session_state[f"is_saved_{action_id}"]
+        if f"evaluation_result_{action_id}" in st.session_state:
+            del st.session_state[f"evaluation_result_{action_id}"]
         st.rerun()
 
 
@@ -642,6 +660,9 @@ def get_agent_for_condition(conditiion: Condition) -> Agent | None:
 def render_condition_tree(action_id: int, root: Operator | None) -> None:
     """Renders the condition tree of an action."""
 
+    flow_state_key = f"flow_state_{action_id}"
+    is_saved_key = f"is_saved_{action_id}"
+
     if root is not None:
         conditions = [
             condition for condition in all_conditions if condition.root_id == root.id
@@ -653,7 +674,7 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         conditions = []
         operators = []
 
-    if f"flow_state_{action_id}" not in st.session_state:
+    if flow_state_key not in st.session_state:
         operator_nodes = [operator.to_node() for operator in operators]
         condition_nodes = [
             condition.to_node(agent=get_agent_for_condition(condition))
@@ -664,13 +685,13 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         ]
         condition_edges = [condition.to_edge() for condition in conditions]
 
-        st.session_state[f"flow_state_{action_id}"] = sf.StreamlitFlowState(
+        st.session_state[flow_state_key] = sf.StreamlitFlowState(
             nodes=operator_nodes + condition_nodes,
             edges=operator_edges + condition_edges,
         )
 
-    if f"is_saved_{action_id}" not in st.session_state:
-        st.session_state[f"is_saved_{action_id}"] = True
+    if is_saved_key not in st.session_state:
+        st.session_state[is_saved_key] = True
 
     with st.container(border=True):
         st.info(
@@ -694,28 +715,28 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
 
             if and_operator_col.button("**AND** operator", key=f"add_and_{action_id}"):
                 operator = Operator(logical_operator=LogicalOperator.AND)
-                st.session_state[f"flow_state_{action_id}"].nodes.append(
+                st.session_state[flow_state_key].nodes.append(
                     operator.to_node(node_id=str(uuid4()))
                 )
-                st.session_state[f"is_saved_{action_id}"] = False
+                st.session_state[is_saved_key] = False
                 st.rerun()
 
             if or_operator_col.button("**OR** operator", key=f"add_or_{action_id}"):
                 operator = Operator(logical_operator=LogicalOperator.OR)
-                st.session_state[f"flow_state_{action_id}"].nodes.append(
+                st.session_state[flow_state_key].nodes.append(
                     operator.to_node(node_id=str(uuid4()))
                 )
-                st.session_state[f"is_saved_{action_id}"] = False
+                st.session_state[is_saved_key] = False
                 st.rerun()
 
         evaluate_button = evaluate_col.button(
             "Evaluate",
             key=f"evaluate_{action_id}",
-            disabled=not st.session_state[f"is_saved_{action_id}"],
+            disabled=not st.session_state[is_saved_key],
             icon=":material/play_arrow:",
             help=(
                 "Evaluate the condition tree."
-                if st.session_state[f"is_saved_{action_id}"]
+                if st.session_state[is_saved_key]
                 else "Save the condition tree before evaluating."
             ),
         )
@@ -729,9 +750,9 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
             if result is not None:
                 st.write(f"**Evaluation result:** `{result}`")
 
-        st.session_state[f"flow_state_{action_id}"] = sf.streamlit_flow(
+        st.session_state[flow_state_key] = sf.streamlit_flow(
             key=f"condition_tree_flow_{action_id}",
-            state=st.session_state[f"flow_state_{action_id}"],
+            state=st.session_state[flow_state_key],
             fit_view=True,
             hide_watermark=True,
             show_controls=False,
@@ -757,7 +778,7 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         ):
             delete_condition_tree(action_id)
 
-    if st.session_state[f"flow_state_{action_id}"].selected_id:
+    if st.session_state[flow_state_key].selected_id:
         if "node_edited" in st.session_state and st.session_state.node_edited:
             st.session_state.node_edited = False
             return
@@ -765,8 +786,8 @@ def render_condition_tree(action_id: int, root: Operator | None) -> None:
         node = next(
             (
                 node
-                for node in st.session_state[f"flow_state_{action_id}"].nodes
-                if node.id == st.session_state[f"flow_state_{action_id}"].selected_id
+                for node in st.session_state[flow_state_key].nodes
+                if node.id == st.session_state[flow_state_key].selected_id
             ),
             None,
         )

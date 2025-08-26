@@ -1,6 +1,6 @@
 [project]
 name = "agents-framework"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 readme = "README.md"
 version = "0.1.0"
 authors = [
@@ -23,7 +23,7 @@ dependencies = [
     "python-multipart==0.0.20",
     "streamlit==1.48.0",
     "streamlit-pydantic==0.6.1rc3",
-    "streamlit-flow-component==1.6.1",
+    "streamlit-flow-component==1.5.0",
     "websocket-client==1.8.0",
 ]
 
@@ -31,7 +31,7 @@ dependencies = [
 dev = [
     "ruff==0.12.8",
     "black==25.1.0",
-    "pre-commit==4.2.0",
+    "pre-commit==4.3.0",
 ]
 
 [tool.ruff]
