@@ -16,15 +16,9 @@ from app.services.action import ActionService
 actions_router = APIRouter(prefix="/actions", dependencies=[Depends(validate_token)])
 
 
-@actions_router.post("", status_code=201)
-async def create_action(
-    action: ActionRequest, db: AsyncSession = Depends(get_db)
-) -> ActionResponse:
-    action = await ActionService.create_action(action, db)
-
-    return ActionResponse.model_validate(
-        action, update={"params": [], "conditions": []}
-    )
+@actions_router.post("", status_code=201, response_model=ActionResponse)
+async def create_action(action: ActionRequest, db: AsyncSession = Depends(get_db)) -> Action:
+    return await ActionService.create_action(action, db)
 
 
 @actions_router.get("", response_model=list[ActionResponse])
@@ -33,9 +27,7 @@ async def get_actions(db: AsyncSession = Depends(get_db)) -> list[Action]:
 
 
 @actions_router.get("/{action_id}", response_model=ActionResponse)
-async def get_action_by_id(
-    action_id: int, db: AsyncSession = Depends(get_db)
-) -> Action:
+async def get_action_by_id(action_id: int, db: AsyncSession = Depends(get_db)) -> Action:
     action = await ActionService.get_action_by_id(action_id, db)
     if action is None:
         raise NotFoundError(f"Action with id {action_id} not found")
@@ -54,7 +46,7 @@ async def update_action(
 
 @actions_router.delete("/{action_id}", status_code=204)
 async def delete_action(action_id: int, db: AsyncSession = Depends(get_db)) -> None:
-    return await ActionService.delete_action(action_id, db)
+    await ActionService.delete_action(action_id, db)
 
 
 @actions_router.post("/{action_id}/evaluate_conditions")

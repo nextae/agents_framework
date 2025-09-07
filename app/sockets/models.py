@@ -5,7 +5,7 @@ from pydantic import BaseModel, field_serializer
 
 from app.llm.models import ChainOutput
 from app.models import Agent
-from app.models.agent_message import QueryResponseDict
+from app.models.agent_message import ActionResponseDict, QueryResponseDict
 from app.models.global_state import State
 
 
@@ -20,7 +20,7 @@ class ActionQueryResponse(BaseModel):
     params: dict[str, Any]
     triggered_agent_id: int | None = None
 
-    def to_message_response(self) -> dict[str, Any]:
+    def to_message_response(self) -> ActionResponseDict:
         return {
             "name": self.name,
             "params": self.params,
@@ -38,9 +38,7 @@ class AgentQueryResponse(BaseModel):
         return str(value)
 
     @classmethod
-    def from_llm_response(
-        cls, agent: Agent, llm_response: ChainOutput
-    ) -> "AgentQueryResponse":
+    def from_llm_response(cls, agent: Agent, llm_response: ChainOutput) -> "AgentQueryResponse":
         """Creates an AgentQueryResponse from an LLM response."""
 
         return cls(

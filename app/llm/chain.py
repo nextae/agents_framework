@@ -18,9 +18,7 @@ load_dotenv()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 
 
-async def create_chain(
-    agent: "Agent", db: AsyncSession
-) -> Runnable[ChainInput, ChainOutput]:
+async def create_chain(agent: "Agent", db: AsyncSession) -> Runnable[ChainInput, ChainOutput]:
     """Creates an LLM chain."""
 
     chat_model = ChatOpenAI(model=OPENAI_MODEL)

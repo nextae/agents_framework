@@ -25,15 +25,9 @@ async def get_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> Agent:
     return agent
 
 
-@agents_router.post("", status_code=201)
-async def create_agent(
-    agent_create: AgentRequest, db: AsyncSession = Depends(get_db)
-) -> AgentResponse:
-    agent = await AgentService.create_agent(agent_create, db)
-
-    return AgentResponse.model_validate(
-        agent, update={"actions": [], "conversation_history": []}
-    )
+@agents_router.post("", status_code=201, response_model=AgentResponse)
+async def create_agent(agent_create: AgentRequest, db: AsyncSession = Depends(get_db)) -> Agent:
+    return await AgentService.create_agent(agent_create, db)
 
 
 @agents_router.patch("/{agent_id}", response_model=AgentResponse)
@@ -45,7 +39,7 @@ async def update_agent(
 
 @agents_router.delete("/{agent_id}", status_code=204)
 async def delete_agent(agent_id: int, db: AsyncSession = Depends(get_db)) -> None:
-    return await AgentService.delete_agent(agent_id, db)
+    await AgentService.delete_agent(agent_id, db)
 
 
 @agents_router.get("/{agent_id}/messages")
@@ -56,10 +50,8 @@ async def get_agent_messages(
 
 
 @agents_router.delete("/{agent_id}/messages", status_code=204)
-async def delete_agent_messages(
-    agent_id: int, db: AsyncSession = Depends(get_db)
-) -> None:
-    return await AgentService.delete_agent_messages(agent_id, db)
+async def delete_agent_messages(agent_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    await AgentService.delete_agent_messages(agent_id, db)
 
 
 @agents_router.post("/assign_action", response_model=AgentsActionsMatch)
@@ -70,7 +62,5 @@ async def assign_action(
 
 
 @agents_router.post("/remove_action")
-async def remove_action(
-    agent_id: int, action_id: int, db: AsyncSession = Depends(get_db)
-) -> None:
-    return await AgentService.remove_action_from_agent(agent_id, action_id, db)
+async def remove_action(agent_id: int, action_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    await AgentService.remove_action_from_agent(agent_id, action_id, db)

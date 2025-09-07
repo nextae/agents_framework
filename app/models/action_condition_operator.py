@@ -8,7 +8,7 @@ class ActionConditionOperatorBase(SQLModel):
     logical_operator: LogicalOperator = Field(
         sa_column=Column(SAEnum(LogicalOperator, native_enum=False), nullable=False)
     )
-    action_id: int = Field(nullable=True, foreign_key="action.id")
+    action_id: int = Field(nullable=False, foreign_key="action.id")
 
 
 class ActionConditionOperator(ActionConditionOperatorBase, table=True):
@@ -16,9 +16,7 @@ class ActionConditionOperator(ActionConditionOperatorBase, table=True):
     parent_id: int | None = Field(
         default=None, nullable=True, foreign_key="actionconditionoperator.id"
     )
-    root_id: int = Field(
-        default=None, nullable=True, foreign_key="actionconditionoperator.id"
-    )
+    root_id: int = Field(default=None, nullable=True, foreign_key="actionconditionoperator.id")
 
     def to_tree_node(self):
         return ActionConditionTreeNode(self.id, self.logical_operator, None, None, None)

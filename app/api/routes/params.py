@@ -38,13 +38,9 @@ async def update_action_param(
     action_param_update: ActionParamUpdateRequest,
     db: AsyncSession = Depends(get_db),
 ) -> ActionParam:
-    return await ActionParamService.update_action_param(
-        action_param_id, action_param_update, db
-    )
+    return await ActionParamService.update_action_param(action_param_id, action_param_update, db)
 
 
 @params_router.delete("/{action_param_id}", status_code=204)
-async def delete_action_param(
-    action_param_id: int, db: AsyncSession = Depends(get_db)
-) -> None:
-    return await ActionParamService.delete_action_param(action_param_id, db)
+async def delete_action_param(action_param_id: int, db: AsyncSession = Depends(get_db)) -> None:
+    await ActionParamService.delete_action_param(action_param_id, db)

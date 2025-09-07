@@ -38,7 +38,10 @@ DATABASE_URL = (
     f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
 )
 
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+tag = context.get_tag_argument()
+if tag != "tests":
+    # In test mode the fixture sets the connection URL
+    config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 
 def run_migrations_offline() -> None:

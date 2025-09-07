@@ -24,10 +24,10 @@ class Action(ActionBase, table=True):
     triggered_agent_id: int | None = Field(default=None, foreign_key="agent.id")
 
     triggered_agent: Optional["Agent"] = Relationship()
-    params: list[ActionParam] = Relationship(cascade_delete=True)
-    agents: list["Agent"] = Relationship(
-        back_populates="actions", link_model=AgentsActionsMatch
+    params: list[ActionParam] = Relationship(
+        cascade_delete=True, sa_relationship_kwargs={"lazy": "selectin"}
     )
+    agents: list["Agent"] = Relationship(back_populates="actions", link_model=AgentsActionsMatch)
 
     def to_structured_output(self) -> type[BaseModel]:
         """Converts the action to a structured output model."""
@@ -43,14 +43,10 @@ class Action(ActionBase, table=True):
             },
         )
 
-    async def __get_condition_tree(
-        self, db: AsyncSession
-    ) -> "ActionConditionTreeNode | None":
+    async def _get_condition_tree(self, db: AsyncSession) -> "ActionConditionTreeNode | None":
         from app.services.action_condition import ActionConditionService
 
-        conditions = await ActionConditionService.get_all_conditions_by_action_id(
-            self.id, db
-        )
+        conditions = await ActionConditionService.get_all_conditions_by_action_id(self.id, db)
         if not conditions:
             return None
 
@@ -58,7 +54,7 @@ class Action(ActionBase, table=True):
         return tree
 
     async def evaluate_conditions(self, db: AsyncSession) -> bool:
-        tree = await self.__get_condition_tree(db)
+        tree = await self._get_condition_tree(db)
         return await tree.evaluate_tree(db) if tree else True
 
 

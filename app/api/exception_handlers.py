@@ -5,12 +5,8 @@ from app.errors.api import ConflictError, NotFoundError
 
 
 async def not_found_error_handler(request: Request, exc: NotFoundError) -> Response:
-    return await http_exception_handler(
-        request, HTTPException(status_code=404, detail=str(exc))
-    )
+    return await http_exception_handler(request, HTTPException(status_code=404, detail=str(exc)))
 
 
 async def conflict_error_handler(request: Request, exc: ConflictError) -> Response:
-    return await http_exception_handler(
-        request, HTTPException(status_code=409, detail=str(exc))
-    )
+    return await http_exception_handler(request, HTTPException(status_code=409, detail=str(exc)))

@@ -28,15 +28,11 @@ class ActionParamService:
 
     @staticmethod
     async def get_action_params(action_id: int, db: AsyncSession) -> list[ActionParam]:
-        result = await db.exec(
-            select(ActionParam).where(ActionParam.action_id == action_id)
-        )
+        result = await db.exec(select(ActionParam).where(ActionParam.action_id == action_id))
         return list(result.all())
 
     @staticmethod
-    async def get_action_param_by_id(
-        action_param_id: int, db: AsyncSession
-    ) -> ActionParam | None:
+    async def get_action_param_by_id(action_param_id: int, db: AsyncSession) -> ActionParam | None:
         return await db.get(ActionParam, action_param_id)
 
     @staticmethod
@@ -64,8 +60,6 @@ class ActionParamService:
     @staticmethod
     async def delete_action_param(action_param_id: int, db: AsyncSession) -> None:
         param = await ActionParamService.get_action_param_by_id(action_param_id, db)
-        if not param:
-            raise NotFoundError(f"ActionParam with id {action_param_id} not found")
-
-        await db.delete(param)
-        await db.commit()
+        if param:
+            await db.delete(param)
+            await db.commit()

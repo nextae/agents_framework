@@ -27,15 +27,20 @@ dependencies = [
     "websocket-client==1.8.0",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "ruff==0.12.8",
-    "black==25.1.0",
     "pre-commit==4.3.0",
+]
+test = [
+    "testcontainers==4.12.0",
+    "pytest==8.4.2",
+    "pytest-asyncio==1.1.0",
 ]
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
+line-length = 100
 
 [tool.ruff.lint]
 select = [

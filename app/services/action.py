@@ -1,5 +1,4 @@
 import sqlalchemy.exc
-from sqlalchemy.orm import selectinload
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -11,8 +10,6 @@ from app.models.action import (
     ActionRequest,
     ActionUpdateRequest,
 )
-
-LOAD_OPTIONS = [selectinload(Action.params)]
 
 
 class ActionService:
@@ -27,9 +24,7 @@ class ActionService:
                 action_request.triggered_agent_id, db
             )
             if triggered_agent is None:
-                raise NotFoundError(
-                    f"Agent with id {action_request.triggered_agent_id} not found"
-                )
+                raise NotFoundError(f"Agent with id {action_request.triggered_agent_id} not found")
 
         try:
             db.add(action)
@@ -42,12 +37,12 @@ class ActionService:
 
     @staticmethod
     async def get_actions(db: AsyncSession) -> list[Action]:
-        result = await db.exec(select(Action).options(*LOAD_OPTIONS))
+        result = await db.exec(select(Action))
         return list(result.all())
 
     @staticmethod
     async def get_action_by_id(action_id: int, db: AsyncSession) -> Action | None:
-        return await db.get(Action, action_id, options=LOAD_OPTIONS)
+        return await db.get(Action, action_id)
 
     @staticmethod
     async def update_action(
@@ -66,15 +61,17 @@ class ActionService:
                 action_update.triggered_agent_id, db
             )
             if triggered_agent is None:
-                raise NotFoundError(
-                    f"Agent with id {action_update.triggered_agent_id} not found"
-                )
+                raise NotFoundError(f"Agent with id {action_update.triggered_agent_id} not found")
 
         action.sqlmodel_update(action_update_data)
 
-        db.add(action)
-        await db.commit()
-        await db.refresh(action)
+        try:
+            db.add(action)
+            await db.commit()
+            await db.refresh(action)
+        except sqlalchemy.exc.IntegrityError:
+            raise ConflictError(f"Action with name {action_update.name} already exists")
+
         return action
 
     @staticmethod
@@ -83,24 +80,18 @@ class ActionService:
 
         action = await ActionService.get_action_by_id(action_id, db)
         if not action:
-            raise NotFoundError(f"Action with id {action_id} not found")
+            return None
 
-        root_operator = await ActionConditionService.try_get_root_for_action_id(
-            action_id, db
-        )
+        root_operator = await ActionConditionService.try_get_root_for_action_id(action_id, db)
         if root_operator is not None:
-            await ActionConditionService.delete_condition_operator(
-                root_operator.id, db, True
-            )
+            await ActionConditionService.delete_condition_operator(root_operator.id, db, True)
 
         await db.delete(action)
         await db.commit()
 
     @staticmethod
     async def agent_has_trigger_actions(agent_id: int, db: AsyncSession) -> bool:
-        result = await db.exec(
-            select(Action).where(Action.triggered_agent_id == agent_id)
-        )
+        result = await db.exec(select(Action).where(Action.triggered_agent_id == agent_id))
         return result.first() is not None
 
     @staticmethod
