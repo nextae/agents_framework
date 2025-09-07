@@ -24,9 +24,7 @@ async def get_player(player_id: int, db: AsyncSession = Depends(get_db)) -> Play
 
 
 @players_router.post("", status_code=201, response_model=PlayerResponse)
-async def create_player(
-    player_create: PlayerRequest, db: AsyncSession = Depends(get_db)
-) -> Player:
+async def create_player(player_create: PlayerRequest, db: AsyncSession = Depends(get_db)) -> Player:
     return await PlayerService.create_player(player_create, db)
 
 
@@ -41,4 +39,4 @@ async def update_player(
 
 @players_router.delete("/{player_id}", status_code=204)
 async def delete_player(player_id: int, db: AsyncSession = Depends(get_db)) -> None:
-    return await PlayerService.delete_player(player_id, db)
+    await PlayerService.delete_player(player_id, db)

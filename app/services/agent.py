@@ -10,25 +10,16 @@ from app.models.agents_actions_match import AgentsActionsMatch
 from app.models.global_state import State
 from app.services.action import ActionService
 
-LOAD_OPTIONS = [selectinload(Agent.actions).selectinload(Action.params)]
-
-EXTRA_LOAD_OPTIONS = LOAD_OPTIONS + [
-    selectinload(Agent.conversation_history),
-    selectinload(Agent.actions).selectinload(Action.triggered_agent),
-]
-
 
 class AgentService:
     @staticmethod
     async def get_agents(db: AsyncSession) -> list[Agent]:
-        result = await db.exec(select(Agent).options(*LOAD_OPTIONS))
+        result = await db.exec(select(Agent))
         return list(result.all())
 
     @staticmethod
     async def get_agent_by_id(agent_id: int, db: AsyncSession) -> Agent | None:
-        return await db.get(
-            Agent, agent_id, options=LOAD_OPTIONS, populate_existing=True
-        )
+        return await db.get(Agent, agent_id, populate_existing=True)
 
     @staticmethod
     async def get_populated_agent(agent_id: int, db: AsyncSession) -> Agent | None:
@@ -38,7 +29,13 @@ class AgentService:
         """
 
         return await db.get(
-            Agent, agent_id, options=EXTRA_LOAD_OPTIONS, populate_existing=True
+            Agent,
+            agent_id,
+            options=[
+                selectinload(Agent.conversation_history),
+                selectinload(Agent.actions).selectinload(Action.triggered_agent),
+            ],
+            populate_existing=True,
         )
 
     @staticmethod
@@ -55,11 +52,11 @@ class AgentService:
     ) -> AgentsActionsMatch:
         agent = await AgentService.get_agent_by_id(agent_id, db)
         if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+            raise NotFoundError(f"Agent with id {agent_id} not found")
 
         action = await ActionService.get_action_by_id(action_id, db)
         if action is None:
-            raise NotFoundError(f"Action with id {action_id} does not exist")
+            raise NotFoundError(f"Action with id {action_id} not found")
 
         match = await db.get(AgentsActionsMatch, (agent_id, action.id))
         if match is not None:
@@ -73,16 +70,14 @@ class AgentService:
         return match
 
     @staticmethod
-    async def remove_action_from_agent(
-        agent_id: int, action_id: int, db: AsyncSession
-    ) -> None:
+    async def remove_action_from_agent(agent_id: int, action_id: int, db: AsyncSession) -> None:
         agent = await AgentService.get_agent_by_id(agent_id, db)
         if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+            raise NotFoundError(f"Agent with id {agent_id} not found")
 
         action = await ActionService.get_action_by_id(action_id, db)
         if action is None:
-            raise NotFoundError(f"Action with id {action_id} does not exist")
+            raise NotFoundError(f"Action with id {action_id} not found")
 
         match = await db.get(AgentsActionsMatch, (agent_id, action.id))
         if match is None:
@@ -99,7 +94,7 @@ class AgentService:
     ) -> Agent:
         agent = await AgentService.get_agent_by_id(agent_id, db)
         if agent is None:
-            raise NotFoundError(f"Agent with id={agent_id} does not exist")
+            raise NotFoundError(f"Agent with id {agent_id} not found")
 
         agent_update_data = agent_update.model_dump(exclude_unset=True)
         agent.sqlmodel_update(agent_update_data)
@@ -112,20 +107,16 @@ class AgentService:
     async def delete_agent(agent_id: int, db: AsyncSession) -> None:
         agent = await AgentService.get_agent_by_id(agent_id, db)
         if not agent:
-            raise NotFoundError(f"Agent with id {agent_id} not found")
+            return None
 
         if await ActionService.agent_has_trigger_actions(agent_id, db):
-            raise ConflictError(
-                f"Agent with id {agent_id} has existing trigger actions"
-            )
+            raise ConflictError(f"Agent with id {agent_id} has existing trigger actions")
 
         await db.delete(agent)
         await db.commit()
 
     @staticmethod
-    async def add_agent_message(
-        message: AgentMessage, db: AsyncSession
-    ) -> AgentMessage:
+    async def add_agent_message(message: AgentMessage, db: AsyncSession) -> AgentMessage:
         db.add(message)
         await db.commit()
         await db.refresh(message)
@@ -135,7 +126,7 @@ class AgentService:
     async def get_agent_messages(agent_id: int, db: AsyncSession) -> list[AgentMessage]:
         agent = await AgentService.get_populated_agent(agent_id, db)
         if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+            raise NotFoundError(f"Agent with id {agent_id} not found")
 
         return agent.conversation_history
 
@@ -143,7 +134,7 @@ class AgentService:
     async def delete_agent_messages(agent_id: int, db: AsyncSession) -> None:
         agent = await AgentService.get_populated_agent(agent_id, db)
         if agent is None:
-            raise NotFoundError(f"Agent with id {agent_id} does not exist")
+            return None
 
         agent.conversation_history.clear()
 

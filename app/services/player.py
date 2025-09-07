@@ -29,7 +29,7 @@ class PlayerService:
     ) -> Player:
         player = await PlayerService.get_player_by_id(player_id, db)
         if player is None:
-            raise NotFoundError(f"Player with id={player_id} does not exist")
+            raise NotFoundError(f"Player with id {player_id} not found")
 
         player_update_data = player_update.model_dump(exclude_unset=True)
         player.sqlmodel_update(player_update_data)
@@ -41,8 +41,6 @@ class PlayerService:
     @staticmethod
     async def delete_player(player_id: int, db: AsyncSession) -> None:
         player = await PlayerService.get_player_by_id(player_id, db)
-        if not player:
-            raise NotFoundError(f"Player with id {player_id} not found")
-
-        await db.delete(player)
-        await db.commit()
+        if player:
+            await db.delete(player)
+            await db.commit()

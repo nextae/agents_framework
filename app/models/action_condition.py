@@ -48,11 +48,11 @@ class ActionConditionTreeNode:
         child.root = self.root
 
     async def evaluate_tree(self, db: AsyncSession) -> bool:
-        return await self.root.__evaluate(db)
+        return await self.root._evaluate(db)
 
-    async def __evaluate(self, db: AsyncSession) -> bool:
+    async def _evaluate(self, db: AsyncSession) -> bool:
         if len(self.children) == 0:
-            state_var = await self.__get_state_variable(db)
+            state_var = await self._get_state_variable(db)
 
             try:
                 expected_value = json.loads(self.expected_value)
@@ -76,26 +76,22 @@ class ActionConditionTreeNode:
             except TypeError:
                 raise ConditionEvaluationError(
                     f"Comparison '{self.comparison.name}' is not valid for values: "
-                    f"state_var={state_var}, expected_value={self.expected_value}"
+                    f"state_var={state_var}, expected_value={expected_value}"
                 )
         else:
-            results = [await child.__evaluate(db) for child in self.children]
+            results = [await child._evaluate(db) for child in self.children]
             if self.logical_operator == LogicalOperator.AND:
                 return all(results)
 
             return any(results)
 
-    async def validate_leaf(self, db: AsyncSession) -> bool:
+    async def validate_leaf(self, db: AsyncSession) -> None:
         if self.logical_operator is not None:
             raise ValueError("Node must be a leaf to validate")
 
-        try:
-            await self.__evaluate(db)
-        except ConditionEvaluationError:
-            return False
-        return True
+        await self._evaluate(db)
 
-    async def __get_state_variable(self, db: AsyncSession) -> StateValue:
+    async def _get_state_variable(self, db: AsyncSession) -> StateValue:
         from app.services.agent import AgentService
 
         if self.state_variable_name.startswith("global"):
@@ -121,10 +117,14 @@ class ActionConditionTreeNode:
                 elif isinstance(current, list):
                     current = current[int(key)]
                 else:
-                    raise StateVariableNotFoundError("State variable not found")
+                    raise StateVariableNotFoundError(
+                        f"State variable name '{self.state_variable_name}' not found"
+                    )
             return current
-        except (KeyError, IndexError, ValueError, TypeError):
-            raise StateVariableNotFoundError("State variable not found")
+        except (KeyError, IndexError, ValueError, TypeError) as e:
+            raise StateVariableNotFoundError(
+                f"State variable name '{self.state_variable_name}' not found"
+            ) from e
 
 
 class ActionConditionBase(SQLModel):
@@ -140,9 +140,8 @@ class ActionConditionBase(SQLModel):
 class ActionCondition(ActionConditionBase, table=True):
     id: int = Field(default=None, primary_key=True)
 
-    async def validate_condition(self, db: AsyncSession) -> bool:
-        tree_node = self.to_tree_node()
-        return await tree_node.validate_leaf(db)
+    async def validate_condition(self, db: AsyncSession) -> None:
+        await self.to_tree_node().validate_leaf(db)
 
     def to_tree_node(self) -> ActionConditionTreeNode:
         return ActionConditionTreeNode(

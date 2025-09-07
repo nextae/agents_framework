@@ -7,11 +7,13 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 load_dotenv()
 
+POSTGRES_USER = getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = getenv("POSTGRES_PASSWORD")
+POSTGRES_SERVER = getenv("POSTGRES_SERVER")
+POSTGRES_DB = getenv("POSTGRES_DB")
+
 DATABASE_URL = (
-    f"postgresql+asyncpg://"
-    f"{getenv('POSTGRES_USER')}:"
-    f"{getenv('POSTGRES_PASSWORD')}"
-    f"@{getenv('POSTGRES_SERVER')}:5432/{getenv('POSTGRES_DB')}"
+    f"postgresql+asyncpg://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_SERVER}:5432/{POSTGRES_DB}"
 )
 
 async_engine = create_async_engine(DATABASE_URL, poolclass=NullPool)

@@ -57,11 +57,23 @@ You can use the `.env.example` file as a template.
 ### Development
 1. Install the dev dependencies
     ```bash
-    uv sync --extra dev
+    uv sync --dev
     ```
 2. Setup pre-commit
     ```bash
     pre-commit install
+    ```
+
+
+---
+### Testing
+1. Install the test dependencies
+    ```bash
+    uv sync --group test
+    ```
+2. Run the tests
+    ```bash
+    pytest
     ```
 
 ---

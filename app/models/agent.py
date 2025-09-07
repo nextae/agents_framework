@@ -38,7 +38,9 @@ class Agent(AgentBase, table=True):
         },
     )
     actions: list[Action] = Relationship(
-        back_populates="agents", link_model=AgentsActionsMatch
+        back_populates="agents",
+        link_model=AgentsActionsMatch,
+        sa_relationship_kwargs={"lazy": "selectin"},
     )
 
     async def to_structured_output(self, db: AsyncSession) -> type[BaseModel]:
