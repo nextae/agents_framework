@@ -15,8 +15,6 @@ from app.sockets.state import (
     update_global_state,
 )
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 @pytest.fixture(scope="module")
 def sio() -> Generator[MagicMock, None, None]:

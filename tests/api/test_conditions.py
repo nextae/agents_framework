@@ -1,4 +1,3 @@
-# pytest app/tests/api/test_conditions.py
 import pytest
 
 from app.core.database import Session
@@ -19,8 +18,6 @@ from app.models.action_condition_operator import (
     NewConditionTreeRequest,
 )
 from app.services.action_condition import ActionConditionService
-
-pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 async def test_create_action_condition__success(client, insert, root_operator, cleanup_db):

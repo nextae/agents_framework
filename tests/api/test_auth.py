@@ -12,8 +12,6 @@ from app.core.auth import decode_access_token, encode_access_token
 
 load_dotenv()
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 ENDPOINTS = [
     # Agents
     ("GET", "/agents"),

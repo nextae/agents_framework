@@ -10,8 +10,6 @@ from app.models.action_param import (
 )
 from app.services.action_param import ActionParamService
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 async def test_create_param__success(client, insert, cleanup_db):
     # given

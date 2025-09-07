@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import UUID, uuid4
 
 import pytest
+import pytest_asyncio
 from pydantic import BaseModel
 
 from app.core.database import Session
@@ -14,8 +15,6 @@ from app.models.agent_message import ActionResponseDict, QueryResponseDict
 from app.services.agent import AgentService
 from app.sockets.agent import query_agent
 from app.sockets.models import ActionQueryResponse, AgentQueryRequest, AgentQueryResponse
-
-pytestmark = pytest.mark.asyncio(loop_scope="session")
 
 
 @pytest.fixture(scope="module")
@@ -29,7 +28,7 @@ def query_id() -> Generator[UUID, None, None]:
 @pytest.fixture
 def chat_model() -> Generator[MagicMock, None, None]:
     with patch("app.llm.chain.ChatOpenAI") as mock_chat_model:
-        yield mock_chat_model
+        yield mock_chat_model.return_value.with_structured_output.return_value
 
 
 @pytest.fixture
@@ -55,24 +54,25 @@ def build_actions_model():
     return _build
 
 
-async def test_query_agent__success(
-    sio, sid, query_id, chat_model, build_actions_model, insert, cleanup_db
-):
-    # given
+@pytest_asyncio.fixture
+async def sample_player(insert) -> Player:
     player = Player(name="Player", description="Player description")
-    player = await insert(player)
+    return await insert(player)
 
-    message = AgentMessage(
-        agent_id=0,
-        caller_agent_id=0,
-        caller_player_id=player.id,
-        query="hi, sing me a song",
-        response=QueryResponseDict(
-            response="Hello! Here's a song for you.",
-            actions=[ActionResponseDict(name="Sing", params={"song_name": "Happy"})],
-        ),
+
+@pytest_asyncio.fixture
+async def sample_agent(insert) -> Agent:
+    agent = Agent(
+        name="Test Agent",
+        description="Test agent description",
+        instructions="You are a helpful test agent.",
     )
-    action = Action(
+    return await insert(agent)
+
+
+@pytest.fixture
+def sample_action() -> Action:
+    return Action(
         name="Sing",
         description="Sing a song",
         params=[
@@ -84,18 +84,55 @@ async def test_query_agent__success(
             )
         ],
     )
+
+
+@pytest_asyncio.fixture
+async def agent_with_action(insert, sample_action: Action) -> Agent:
+    agent = Agent(
+        name="Singer",
+        description="Singer agent that sings songs",
+        instructions="You are a helpful assistant that sings songs.",
+        actions=[sample_action],
+    )
+    return await insert(agent)
+
+
+async def test_query_agent__success(
+    sio,
+    sid,
+    query_id,
+    chat_model,
+    build_actions_model,
+    sample_player,
+    sample_action,
+    insert,
+    cleanup_db,
+):
+    # given
+    message = AgentMessage(
+        agent_id=0,
+        caller_agent_id=0,
+        caller_player_id=sample_player.id,
+        query="hi, sing me a song",
+        response=QueryResponseDict(
+            response="Hello! Here's a song for you.",
+            actions=[ActionResponseDict(name="Sing", params={"song_name": "Happy"})],
+        ),
+    )
     agent = Agent(
         name="Singer",
         description="Singer agent that sings songs",
         instructions="You are a helpful assistant that sings songs.",
         conversation_history=[message],
-        actions=[action],
+        actions=[sample_action],
     )
     agent = await insert(agent)
 
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="another song please")
+    request = AgentQueryRequest(
+        agent_id=agent.id, player_id=sample_player.id, query="another song please"
+    )
 
-    chat_model.return_value.with_structured_output.return_value.return_value = ChainOutput(
+    chat_model.return_value = ChainOutput(
         response="Sure! Here's a song for you.",
         actions=build_actions_model({"Sing": {"song_name": "Twinkle Twinkle Little Star"}}),
     )
@@ -127,16 +164,25 @@ async def test_query_agent__success(
     async with Session() as db:
         messages = await AgentService.get_agent_messages(agent.id, db)
         assert len(messages) == 2
-        new_message = messages[1]
-        assert new_message.caller_player_id == player.id
-        assert new_message.query == request.query
-        assert new_message.response == expected_agent_response.to_message_response()
-        assert new_message.agent_id == agent.id
-        assert new_message.caller_agent_id is None
+        message = messages[1]
+        assert message.caller_player_id == sample_player.id
+        assert message.query == request.query
+        assert message.response == expected_agent_response.to_message_response()
+        assert message.agent_id == agent.id
+        assert message.caller_agent_id is None
 
 
 async def test_query_agent__trigger_agents__success(
-    sio, sid, query_id, chat_model, logger, build_actions_model, insert, cleanup_db
+    sio,
+    sid,
+    query_id,
+    chat_model,
+    logger,
+    build_actions_model,
+    insert,
+    cleanup_db,
+    sample_player,
+    sample_action,
 ):
     # given
     agent_3 = Agent(
@@ -167,44 +213,31 @@ async def test_query_agent__trigger_agents__success(
     )
     agent_2 = await insert(agent_2)
 
-    player = Player(name="Player", description="Player description")
-    player = await insert(player)
-
     message = AgentMessage(
         agent_id=0,
         caller_agent_id=0,
-        caller_player_id=player.id,
+        caller_player_id=sample_player.id,
         query="hi, sing me a song",
         response=QueryResponseDict(
             response="Hello! Here's a song for you.",
             actions=[ActionResponseDict(name="Sing", params={"song_name": "Happy"})],
         ),
     )
-    action = Action(
-        name="Sing",
-        description="Sing a song",
-        params=[
-            ActionParam(
-                name="song_name",
-                description="Name of the song",
-                type=ActionParamType.STRING,
-                action_id=0,
-            )
-        ],
-        triggered_agent_id=agent_2.id,
-    )
+    sample_action.triggered_agent_id = agent_2.id
     agent = Agent(
         name="Singer",
         description="Singer agent that sings songs",
         instructions="You are a helpful assistant that sings songs.",
         conversation_history=[message],
-        actions=[action],
+        actions=[sample_action],
     )
     agent = await insert(agent)
 
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="another song please")
+    request = AgentQueryRequest(
+        agent_id=agent.id, player_id=sample_player.id, query="another song please"
+    )
 
-    chat_model.return_value.with_structured_output.return_value.side_effect = [
+    chat_model.side_effect = [
         ChainOutput(
             response="Sure! Here's a song for you.",
             actions=build_actions_model({"Sing": {"song_name": "Twinkle Twinkle Little Star"}}),
@@ -266,7 +299,7 @@ async def test_query_agent__trigger_agents__success(
     logger.warning.assert_not_called()
     logger.debug.assert_has_calls(
         [
-            call(f"Triggering agent {agent_2.name} from action {action.name}"),
+            call(f"Triggering agent {agent_2.name} from action {sample_action.name}"),
             call(f"Triggering agent {agent_3.name} from action {action_2.name}"),
         ]
     )
@@ -274,12 +307,12 @@ async def test_query_agent__trigger_agents__success(
     async with Session() as db:
         messages = await AgentService.get_agent_messages(agent.id, db)
         assert len(messages) == 3
-        new_message = messages[1]
-        assert new_message.caller_player_id == player.id
-        assert new_message.query == request.query
-        assert new_message.response == expected_agent_response_1.to_message_response()
-        assert new_message.agent_id == agent.id
-        assert new_message.caller_agent_id is None
+        message = messages[1]
+        assert message.caller_player_id == sample_player.id
+        assert message.query == request.query
+        assert message.response == expected_agent_response_1.to_message_response()
+        assert message.agent_id == agent.id
+        assert message.caller_agent_id is None
 
         trigger_agent_2_message = messages[2]
         assert trigger_agent_2_message.caller_player_id is None
@@ -290,12 +323,12 @@ async def test_query_agent__trigger_agents__success(
 
         messages = await AgentService.get_agent_messages(agent_2.id, db)
         assert len(messages) == 2
-        new_message = messages[0]
-        assert new_message.caller_player_id is None
-        assert new_message.query == str({"song_name": "Twinkle Twinkle Little Star"})
-        assert new_message.response == expected_agent_response_2.to_message_response()
-        assert new_message.agent_id == agent_2.id
-        assert new_message.caller_agent_id == agent.id
+        message = messages[0]
+        assert message.caller_player_id is None
+        assert message.query == str({"song_name": "Twinkle Twinkle Little Star"})
+        assert message.response == expected_agent_response_2.to_message_response()
+        assert message.agent_id == agent_2.id
+        assert message.caller_agent_id == agent.id
 
         trigger_agent_3_message = messages[1]
         assert trigger_agent_3_message.caller_player_id is None
@@ -306,20 +339,17 @@ async def test_query_agent__trigger_agents__success(
 
         messages = await AgentService.get_agent_messages(agent_3.id, db)
         assert len(messages) == 1
-        new_message = messages[0]
-        assert new_message.caller_player_id is None
-        assert new_message.query == str({"question": "What is the meaning of life?"})
-        assert new_message.response == expected_agent_response_3.to_message_response()
-        assert new_message.agent_id == agent_3.id
-        assert new_message.caller_agent_id == agent_2.id
+        message = messages[0]
+        assert message.caller_player_id is None
+        assert message.query == str({"question": "What is the meaning of life?"})
+        assert message.response == expected_agent_response_3.to_message_response()
+        assert message.agent_id == agent_3.id
+        assert message.caller_agent_id == agent_2.id
 
 
-async def test_query_agent__agent_not_found(sio, sid, insert, cleanup_db):
+async def test_query_agent__agent_not_found(sio, sid, sample_player, cleanup_db):
     # given
-    player = Player(name="Player")
-    player = await insert(player)
-
-    request = AgentQueryRequest(agent_id=999, player_id=player.id, query="hello")
+    request = AgentQueryRequest(agent_id=999, player_id=sample_player.id, query="hello")
 
     # when
     result = await query_agent(sid, request.model_dump())
@@ -329,12 +359,9 @@ async def test_query_agent__agent_not_found(sio, sid, insert, cleanup_db):
     sio.emit.assert_not_awaited()
 
 
-async def test_query_agent__player_not_found(sio, sid, insert, cleanup_db):
+async def test_query_agent__player_not_found(sio, sid, sample_agent, cleanup_db):
     # given
-    agent = Agent(name="Agent")
-    agent = await insert(agent)
-
-    request = AgentQueryRequest(agent_id=agent.id, player_id=999, query="hello")
+    request = AgentQueryRequest(agent_id=sample_agent.id, player_id=999, query="hello")
 
     # when
     result = await query_agent(sid, request.model_dump())
@@ -344,11 +371,8 @@ async def test_query_agent__player_not_found(sio, sid, insert, cleanup_db):
     sio.emit.assert_not_awaited()
 
 
-async def test_query_agent__condition_evaluation_error(sio, sid, insert, cleanup_db):
+async def test_query_agent__condition_evaluation_error(sio, sid, sample_player, insert, cleanup_db):
     # given
-    player = Player(name="Player")
-    player = await insert(player)
-
     action = Action(
         name="Test Action",
         description="An action with a condition that will fail",
@@ -376,7 +400,7 @@ async def test_query_agent__condition_evaluation_error(sio, sid, insert, cleanup
     )
     await insert(condition)
 
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="hello")
+    request = AgentQueryRequest(agent_id=agent.id, player_id=sample_player.id, query="hello")
 
     # when
     result = await query_agent(sid, request.model_dump())
@@ -394,17 +418,13 @@ async def test_query_agent__condition_evaluation_error(sio, sid, insert, cleanup
     )
 
 
-async def test_query_agent__internal_server_error(sio, sid, chat_model, insert, cleanup_db):
+async def test_query_agent__internal_server_error(
+    sio, sid, chat_model, sample_player, sample_agent, cleanup_db
+):
     # given
-    player = Player(name="Player")
-    player = await insert(player)
+    request = AgentQueryRequest(agent_id=sample_agent.id, player_id=sample_player.id, query="hello")
 
-    agent = Agent(name="Agent")
-    agent = await insert(agent)
-
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="hello")
-
-    chat_model.return_value.with_structured_output.return_value.side_effect = Exception("LLM error")
+    chat_model.side_effect = Exception("LLM error")
 
     # when
     result = await query_agent(sid, request.model_dump())
@@ -417,7 +437,16 @@ async def test_query_agent__internal_server_error(sio, sid, chat_model, insert, 
 
 
 async def test_query_agent__trigger_agents__condition_evaluation_error(
-    sio, sid, query_id, chat_model, logger, build_actions_model, insert, cleanup_db
+    sio,
+    sid,
+    query_id,
+    chat_model,
+    logger,
+    build_actions_model,
+    sample_player,
+    sample_action,
+    insert,
+    cleanup_db,
 ):
     # given
     agent_3 = Agent(
@@ -449,19 +478,15 @@ async def test_query_agent__trigger_agents__condition_evaluation_error(
     )
     agent_2 = await insert(agent_2)
 
-    action = Action(
-        name="Sing",
-        description="Sing a song",
-        params=[
-            ActionParam(
-                name="song_name",
-                description="Name of the song",
-                type=ActionParamType.STRING,
-                action_id=0,
-            )
-        ],
-        triggered_agent_id=agent_2.id,
+    sample_action.triggered_agent_id = agent_2.id
+    agent = Agent(
+        name="Singer",
+        description="Singer agent that sings songs",
+        instructions="You are a helpful assistant that sings songs.",
+        actions=[sample_action],
     )
+    agent = await insert(agent)
+
     condition_root = ActionConditionOperator(
         action_id=action_2.id,
         logical_operator=LogicalOperator.OR,
@@ -480,25 +505,14 @@ async def test_query_agent__trigger_agents__condition_evaluation_error(
     )
     await insert(condition)
 
-    agent = Agent(
-        name="Singer",
-        description="Singer agent that sings songs",
-        instructions="You are a helpful assistant that sings songs.",
-        actions=[action],
+    request = AgentQueryRequest(
+        agent_id=agent.id, player_id=sample_player.id, query="another song please"
     )
-    agent = await insert(agent)
 
-    player = Player(name="Player", description="Player description")
-    player = await insert(player)
-
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="another song please")
-
-    chat_model.return_value.with_structured_output.return_value.side_effect = [
-        ChainOutput(
-            response="Sure! Here's a song for you.",
-            actions=build_actions_model({"Sing": {"song_name": "Twinkle Twinkle Little Star"}}),
-        ),
-    ]
+    chat_model.return_value = ChainOutput(
+        response="Sure! Here's a song for you.",
+        actions=build_actions_model({"Sing": {"song_name": "Twinkle Twinkle Little Star"}}),
+    )
 
     # when
     result = await query_agent(sid, request.model_dump())
@@ -534,12 +548,21 @@ async def test_query_agent__trigger_agents__condition_evaluation_error(
     )
     logger.warning.assert_not_called()
     logger.debug.assert_called_once_with(
-        f"Triggering agent {agent_2.name} from action {action.name}"
+        f"Triggering agent {agent_2.name} from action {sample_action.name}"
     )
 
 
 async def test_query_agent__trigger_agents__internal_server_error(
-    sio, sid, query_id, chat_model, logger, build_actions_model, insert, cleanup_db
+    sio,
+    sid,
+    query_id,
+    chat_model,
+    logger,
+    build_actions_model,
+    sample_player,
+    agent_with_action,
+    insert,
+    cleanup_db,
 ):
     # given
     agent_2 = Agent(
@@ -549,33 +572,15 @@ async def test_query_agent__trigger_agents__internal_server_error(
     )
     agent_2 = await insert(agent_2)
 
-    player = Player(name="Player", description="Player description")
-    player = await insert(player)
-
-    action = Action(
-        name="Sing",
-        description="Sing a song",
-        params=[
-            ActionParam(
-                name="song_name",
-                description="Name of the song",
-                type=ActionParamType.STRING,
-                action_id=0,
-            )
-        ],
-        triggered_agent_id=agent_2.id,
-    )
-    agent = Agent(
-        name="Singer",
-        description="Singer agent that sings songs",
-        instructions="You are a helpful assistant that sings songs.",
-        actions=[action],
-    )
+    agent = agent_with_action
+    agent.actions[0].triggered_agent_id = agent_2.id
     agent = await insert(agent)
 
-    request = AgentQueryRequest(agent_id=agent.id, player_id=player.id, query="another song please")
+    request = AgentQueryRequest(
+        agent_id=agent.id, player_id=sample_player.id, query="another song please"
+    )
 
-    chat_model.return_value.with_structured_output.return_value.side_effect = [
+    chat_model.side_effect = [
         ChainOutput(
             response="Sure! Here's a song for you.",
             actions=build_actions_model({"Sing": {"song_name": "Twinkle Twinkle Little Star"}}),
@@ -609,7 +614,7 @@ async def test_query_agent__trigger_agents__internal_server_error(
     )
     logger.warning.assert_not_called()
     logger.debug.assert_called_once_with(
-        f"Triggering agent {agent_2.name} from action {action.name}"
+        f"Triggering agent {agent_2.name} from action {agent_with_action.actions[0].name}"
     )
 
 

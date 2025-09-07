@@ -1,5 +1,6 @@
 import os
 from collections.abc import AsyncGenerator, Callable, Generator
+from typing import TypeVar
 
 import pytest
 import pytest_asyncio
@@ -155,6 +156,9 @@ async def _insert_player(session: AsyncSession, player: Player) -> Player:
     return player
 
 
+ModelType = TypeVar("ModelType", bound=SQLModel)
+
+
 INSERT_FUNCTIONS: dict[type[SQLModel], Callable] = {
     Action: _insert_action,
     ActionCondition: _insert_action_condition,
@@ -170,7 +174,7 @@ INSERT_FUNCTIONS: dict[type[SQLModel], Callable] = {
 
 @pytest.fixture
 def insert():
-    async def _insert(*models: SQLModel) -> list[SQLModel] | SQLModel:
+    async def _insert(*models: ModelType) -> list[ModelType] | ModelType:
         async with Session() as session:
             inserted_models = []
             for model in models:

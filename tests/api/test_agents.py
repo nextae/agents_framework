@@ -8,8 +8,6 @@ from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequ
 from app.models.agent_message import QueryResponseDict
 from app.services.agent import AgentService
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 async def test_get_agents__success(client, insert, cleanup_db):
     # given

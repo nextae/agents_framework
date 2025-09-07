@@ -12,8 +12,6 @@ from app.models.action_condition import ActionCondition, ComparisonMethod
 from app.models.action_param import ActionParamType
 from app.services.action import ActionService
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 async def test_get_actions__success(client, insert, cleanup_db):
     # given

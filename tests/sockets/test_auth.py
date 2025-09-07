@@ -12,8 +12,6 @@ from app.sockets.models import AuthPayload
 
 load_dotenv()
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 @pytest.fixture(scope="module")
 def sio() -> Generator[MagicMock, None, None]:

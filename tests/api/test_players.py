@@ -4,8 +4,6 @@ from app.core.database import Session
 from app.models.player import Player, PlayerRequest, PlayerResponse, PlayerUpdateRequest
 from app.services.player import PlayerService
 
-pytestmark = pytest.mark.asyncio(loop_scope="session")
-
 
 async def test_get_players__success(client, insert, cleanup_db):
     # given
