@@ -29,7 +29,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
-    "ruff==0.12.8",
+    "ruff==0.12.12",
     "pre-commit==4.3.0",
 ]
 test = [
