@@ -31,4 +31,6 @@ jobs:
         run: uv run ruff check --output-format=github .
 
       - name: Run tests
-        run: uv run pytest tests
+        run: |
+          cp .env.example .env
+          uv run pytest tests
