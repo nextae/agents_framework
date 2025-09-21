@@ -21,8 +21,8 @@ ENDPOINTS = [
     ("DELETE", "/agents/1"),
     ("GET", "/agents/1/messages"),
     ("DELETE", "/agents/1/messages"),
-    ("POST", "/agents/assign_action"),
-    ("POST", "/agents/remove_action"),
+    ("POST", "/agents/1/actions/1/assign"),
+    ("POST", "/agents/1/actions/1/remove"),
     # Actions
     ("POST", "/actions"),
     ("GET", "/actions"),

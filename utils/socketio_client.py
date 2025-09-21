@@ -1,8 +1,17 @@
 import json
+import os
 import threading
 from typing import Any
+from urllib.parse import urlencode
 
+import requests
 import socketio
+from dotenv import load_dotenv
+
+load_dotenv()
+
+APP_USER = os.getenv("APP_USER")
+APP_PASSWORD = os.getenv("APP_PASSWORD")
 
 client = socketio.Client()
 
@@ -67,12 +76,32 @@ def agent_response(data: dict[str, Any]):
     print(data)
 
 
+def login() -> str:
+    payload = {
+        "grant_type": "password",
+        "username": APP_USER,
+        "password": APP_PASSWORD,
+    }
+
+    response = requests.post(
+        f"http://localhost:{PORT}/api/v1/login",
+        data=urlencode(payload),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+    )
+    response.raise_for_status()
+    token = response.json().get("access_token")
+    if not token:
+        raise RuntimeError("No access token found in the response.")
+
+    return token
+
+
 if __name__ == "__main__":
-    client.connect(f"http://localhost:{PORT}", transports=["websocket"])
+    client.connect(
+        f"http://localhost:{PORT}", auth={"access_token": login()}, transports=["websocket"]
+    )
     while True:
-        events_text = "\n".join(
-            f"{i}. {event}" for i, event in enumerate(EVENTS, start=1)
-        )
+        events_text = "\n".join(f"{i}. {event}" for i, event in enumerate(EVENTS, start=1))
         event_index = input(f"Enter the event:\n{events_text}\n")
         if event_index == "/exit":
             break

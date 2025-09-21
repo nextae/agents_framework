@@ -3,10 +3,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.database import Session
 from app.models import Agent
-from app.services.agent import AgentService
-from app.services.global_state import GlobalStateService
+from app.services.agent_service import AgentService
+from app.services.global_state_service import GlobalStateService
 from app.sockets.models import UpdateAgentStateRequest, UpdateStateRequest
 from app.sockets.state import (
     get_agent_state,
@@ -32,9 +31,8 @@ async def test_update_global_state__success(sio, sid, cleanup_db):
 
     # then
     assert response == request.model_dump()
-    async with Session() as db:
-        global_state = await GlobalStateService.get_state(db)
-        assert global_state.state == request.state
+    global_state = await GlobalStateService().get_state()
+    assert global_state.state == request.state
 
 
 async def test_update_global_state__validation_error(sio, sid):
@@ -51,10 +49,9 @@ async def test_update_global_state__validation_error(sio, sid):
 async def test_get_global_state__success(sio, sid, cleanup_db):
     # given
     state = {"key": "value"}
-    async with Session() as db:
-        global_state = await GlobalStateService.get_state(db)
-        global_state.state = state
-        await GlobalStateService.update_state(global_state, db)
+    global_state = await GlobalStateService().get_state()
+    global_state.state = state
+    await GlobalStateService().update_state(global_state)
 
     # when
     response = await get_global_state(sid)
@@ -75,10 +72,9 @@ async def test_update_agent_state__success(sio, sid, insert, cleanup_db):
 
     # then
     assert response == request.model_dump()
-    async with Session() as db:
-        updated_agent = await AgentService.get_agent_by_id(agent.id, db)
-        assert updated_agent is not None
-        assert updated_agent.state == request.state
+    updated_agent = await AgentService().get_agent_by_id(agent.id)
+    assert updated_agent is not None
+    assert updated_agent.state == request.state
 
 
 async def test_update_agent_state__agent_not_found(sio, sid):

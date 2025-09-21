@@ -1,6 +1,5 @@
 import pytest
 
-from app.core.database import Session
 from app.models import Action, ActionParam
 from app.models.action_param import (
     ActionParamRequest,
@@ -8,7 +7,7 @@ from app.models.action_param import (
     ActionParamType,
     ActionParamUpdateRequest,
 )
-from app.services.action_param import ActionParamService
+from app.services.action_param_service import ActionParamService
 
 
 async def test_create_param__success(client, insert, cleanup_db):
@@ -240,6 +239,29 @@ async def test_update_action_param__not_found(client, cleanup_db):
     assert f"ActionParam with id {param_id} not found" in response.text
 
 
+async def test_update_action_param__action_not_found(client, insert, cleanup_db):
+    # given
+    action = Action(name="Test Action")
+    action = await insert(action)
+    param = ActionParam(
+        action_id=action.id,
+        name="Old Name",
+        description="Old Description",
+        type=ActionParamType.STRING,
+    )
+    param = await insert(param)
+    request = ActionParamUpdateRequest(action_id=999)
+
+    # when
+    response = await client.patch(
+        f"/params/{param.id}", json=request.model_dump(exclude_unset=True)
+    )
+
+    # then
+    assert response.status_code == 404
+    assert f"Action with id {request.action_id} not found" in response.text
+
+
 async def test_update_action_param__invalid_request(client, insert, cleanup_db):
     # given
     action = Action(name="Test Action")
@@ -274,8 +296,7 @@ async def test_delete_action_param__success(client, insert, cleanup_db):
 
     # then
     assert response.status_code == 204
-    async with Session() as db:
-        assert await ActionParamService.get_action_param_by_id(param.id, db) is None
+    assert await ActionParamService().get_action_param_by_id(param.id) is None
 
 
 async def test_delete_action_param__not_found(client, cleanup_db):

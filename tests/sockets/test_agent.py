@@ -6,13 +6,12 @@ import pytest
 import pytest_asyncio
 from pydantic import BaseModel
 
-from app.core.database import Session
 from app.llm.models import ChainOutput
 from app.models import Action, ActionConditionOperator, ActionParam, Agent, AgentMessage, Player
 from app.models.action_condition import ActionCondition, ComparisonMethod, LogicalOperator
 from app.models.action_param import ActionParamType
 from app.models.agent_message import ActionResponseDict, QueryResponseDict
-from app.services.agent import AgentService
+from app.services.agent_service import AgentService
 from app.sockets.agent import query_agent
 from app.sockets.models import ActionQueryResponse, AgentQueryRequest, AgentQueryResponse
 
@@ -27,7 +26,7 @@ def query_id() -> Generator[UUID, None, None]:
 
 @pytest.fixture
 def chat_model() -> Generator[MagicMock, None, None]:
-    with patch("app.llm.chain.ChatOpenAI") as mock_chat_model:
+    with patch("app.services.llm_service.ChatOpenAI") as mock_chat_model:
         yield mock_chat_model.return_value.with_structured_output.return_value
 
 
@@ -161,15 +160,14 @@ async def test_query_agent__success(
         ]
     )
 
-    async with Session() as db:
-        messages = await AgentService.get_agent_messages(agent.id, db)
-        assert len(messages) == 2
-        message = messages[1]
-        assert message.caller_player_id == sample_player.id
-        assert message.query == request.query
-        assert message.response == expected_agent_response.to_message_response()
-        assert message.agent_id == agent.id
-        assert message.caller_agent_id is None
+    messages = await AgentService().get_agent_messages(agent.id)
+    assert len(messages) == 2
+    message = messages[1]
+    assert message.caller_player_id == sample_player.id
+    assert message.query == request.query
+    assert message.response == expected_agent_response.to_message_response()
+    assert message.agent_id == agent.id
+    assert message.caller_agent_id is None
 
 
 async def test_query_agent__trigger_agents__success(
@@ -201,7 +199,14 @@ async def test_query_agent__trigger_agents__success(
                 description="A question for Agent 3",
                 type=ActionParamType.STRING,
                 action_id=0,
-            )
+            ),
+            ActionParam(
+                name="example",
+                description="An example parameter",
+                type=ActionParamType.LITERAL,
+                action_id=0,
+                literal_values=["example1", "example2", 123],
+            ),
         ],
         triggered_agent_id=agent_3.id,
     )
@@ -304,47 +309,46 @@ async def test_query_agent__trigger_agents__success(
         ]
     )
 
-    async with Session() as db:
-        messages = await AgentService.get_agent_messages(agent.id, db)
-        assert len(messages) == 3
-        message = messages[1]
-        assert message.caller_player_id == sample_player.id
-        assert message.query == request.query
-        assert message.response == expected_agent_response_1.to_message_response()
-        assert message.agent_id == agent.id
-        assert message.caller_agent_id is None
+    messages = await AgentService().get_agent_messages(agent.id)
+    assert len(messages) == 3
+    message = messages[1]
+    assert message.caller_player_id == sample_player.id
+    assert message.query == request.query
+    assert message.response == expected_agent_response_1.to_message_response()
+    assert message.agent_id == agent.id
+    assert message.caller_agent_id is None
 
-        trigger_agent_2_message = messages[2]
-        assert trigger_agent_2_message.caller_player_id is None
-        assert trigger_agent_2_message.query == str({"song_name": "Twinkle Twinkle Little Star"})
-        assert trigger_agent_2_message.response == expected_agent_response_2.to_message_response()
-        assert trigger_agent_2_message.agent_id == agent_2.id
-        assert trigger_agent_2_message.caller_agent_id == agent.id
+    trigger_agent_2_message = messages[2]
+    assert trigger_agent_2_message.caller_player_id is None
+    assert trigger_agent_2_message.query == str({"song_name": "Twinkle Twinkle Little Star"})
+    assert trigger_agent_2_message.response == expected_agent_response_2.to_message_response()
+    assert trigger_agent_2_message.agent_id == agent_2.id
+    assert trigger_agent_2_message.caller_agent_id == agent.id
 
-        messages = await AgentService.get_agent_messages(agent_2.id, db)
-        assert len(messages) == 2
-        message = messages[0]
-        assert message.caller_player_id is None
-        assert message.query == str({"song_name": "Twinkle Twinkle Little Star"})
-        assert message.response == expected_agent_response_2.to_message_response()
-        assert message.agent_id == agent_2.id
-        assert message.caller_agent_id == agent.id
+    messages = await AgentService().get_agent_messages(agent_2.id)
+    assert len(messages) == 2
+    message = messages[0]
+    assert message.caller_player_id is None
+    assert message.query == str({"song_name": "Twinkle Twinkle Little Star"})
+    assert message.response == expected_agent_response_2.to_message_response()
+    assert message.agent_id == agent_2.id
+    assert message.caller_agent_id == agent.id
 
-        trigger_agent_3_message = messages[1]
-        assert trigger_agent_3_message.caller_player_id is None
-        assert trigger_agent_3_message.query == str({"question": "What is the meaning of life?"})
-        assert trigger_agent_3_message.response == expected_agent_response_3.to_message_response()
-        assert trigger_agent_3_message.agent_id == agent_3.id
-        assert trigger_agent_3_message.caller_agent_id == agent_2.id
+    trigger_agent_3_message = messages[1]
+    assert trigger_agent_3_message.caller_player_id is None
+    assert trigger_agent_3_message.query == str({"question": "What is the meaning of life?"})
+    assert trigger_agent_3_message.response == expected_agent_response_3.to_message_response()
+    assert trigger_agent_3_message.agent_id == agent_3.id
+    assert trigger_agent_3_message.caller_agent_id == agent_2.id
 
-        messages = await AgentService.get_agent_messages(agent_3.id, db)
-        assert len(messages) == 1
-        message = messages[0]
-        assert message.caller_player_id is None
-        assert message.query == str({"question": "What is the meaning of life?"})
-        assert message.response == expected_agent_response_3.to_message_response()
-        assert message.agent_id == agent_3.id
-        assert message.caller_agent_id == agent_2.id
+    messages = await AgentService().get_agent_messages(agent_3.id)
+    assert len(messages) == 1
+    message = messages[0]
+    assert message.caller_player_id is None
+    assert message.query == str({"question": "What is the meaning of life?"})
+    assert message.response == expected_agent_response_3.to_message_response()
+    assert message.agent_id == agent_3.id
+    assert message.caller_agent_id == agent_2.id
 
 
 async def test_query_agent__agent_not_found(sio, sid, sample_player, cleanup_db):
@@ -394,7 +398,8 @@ async def test_query_agent__condition_evaluation_error(sio, sid, sample_player, 
     condition = ActionCondition(
         parent_id=condition_root.id,
         root_id=condition_root.id,
-        state_variable_name=f"agent-{agent.id}/status",
+        state_agent_id=agent.id,
+        state_variable_name="status",
         comparison=ComparisonMethod.GREATER,
         expected_value="123",
     )
@@ -499,7 +504,8 @@ async def test_query_agent__trigger_agents__condition_evaluation_error(
     condition = ActionCondition(
         parent_id=condition_root.id,
         root_id=condition_root.id,
-        state_variable_name=f"agent-{agent_2.id}/status",
+        state_agent_id=agent_2.id,
+        state_variable_name="status",
         comparison=ComparisonMethod.GREATER,
         expected_value="123",
     )

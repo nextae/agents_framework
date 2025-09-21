@@ -24,9 +24,7 @@ def error_toast(response: requests.Response) -> None:
     """Displays an error toast with the response message."""
 
     try:
-        st.toast(
-            "**Error:**\n" + str(response.json().get("detail")), icon=":material/error:"
-        )
+        st.toast("**Error:**\n" + str(response.json().get("detail")), icon=":material/error:")
         logger.error(response.json())
     except (AttributeError, ValueError):
         st.toast("**Error:**\n" + str(response.text), icon=":material/error:")
@@ -40,9 +38,7 @@ def fetch(method: str, endpoint: str, **kwargs) -> requests.Response | None:
         headers["Authorization"] = f"Bearer {st.session_state.access_token}"
 
     try:
-        response = requests.request(
-            method, BASE_URL + endpoint, headers=headers, **kwargs
-        )
+        response = requests.request(method, BASE_URL + endpoint, headers=headers, **kwargs)
     except requests.ConnectionError:
         st.toast(
             "**Error:**\nCould not connect to the server.",
@@ -103,10 +99,7 @@ def get_agents() -> list[Agent]:
         return []
 
     return sorted(
-        (
-            Agent.from_response(AgentResponse.model_validate(agent))
-            for agent in response.json()
-        ),
+        (Agent.from_response(AgentResponse.model_validate(agent)) for agent in response.json()),
         key=lambda agent: agent.id,
     )
 
@@ -175,11 +168,7 @@ def delete_agent_messages(agent_id: int) -> bool:
 
 
 def assign_action(agent_id: int, action_id: int) -> bool:
-    response = fetch(
-        "POST",
-        "/agents/assign_action",
-        params={"agent_id": agent_id, "action_id": action_id},
-    )
+    response = fetch("POST", f"/agents/{agent_id}/actions/{action_id}/assign")
     if response is None:
         return False
 
@@ -191,11 +180,7 @@ def assign_action(agent_id: int, action_id: int) -> bool:
 
 
 def remove_action(agent_id: int, action_id: int) -> bool:
-    response = fetch(
-        "POST",
-        "/agents/remove_action",
-        params={"agent_id": agent_id, "action_id": action_id},
-    )
+    response = fetch("POST", f"/agents/{agent_id}/actions/{action_id}/remove")
     if response is None:
         return False
 
@@ -217,10 +202,7 @@ def get_actions() -> list[Action]:
         return []
 
     return sorted(
-        (
-            Action.from_response(ActionResponse.model_validate(action))
-            for action in response.json()
-        ),
+        (Action.from_response(ActionResponse.model_validate(action)) for action in response.json()),
         key=lambda action: action.id,
     )
 
@@ -285,9 +267,7 @@ def create_action_param(param_dict: dict) -> ActionParam | None:
         error_toast(response)
         return None
 
-    return ActionParam.from_response(
-        ActionParamResponse.model_validate(response.json())
-    )
+    return ActionParam.from_response(ActionParamResponse.model_validate(response.json()))
 
 
 def update_action_param(param_dict: dict) -> ActionParam | None:
@@ -299,9 +279,7 @@ def update_action_param(param_dict: dict) -> ActionParam | None:
         error_toast(response)
         return None
 
-    return ActionParam.from_response(
-        ActionParamResponse.model_validate(response.json())
-    )
+    return ActionParam.from_response(ActionParamResponse.model_validate(response.json()))
 
 
 def delete_action_param(param_id: int) -> bool:
@@ -330,10 +308,7 @@ def get_players() -> list[Player]:
         return []
 
     return sorted(
-        (
-            Player.from_response(PlayerResponse.model_validate(player))
-            for player in response.json()
-        ),
+        (Player.from_response(PlayerResponse.model_validate(player)) for player in response.json()),
         key=lambda player: player.id,
     )
 
@@ -418,9 +393,7 @@ def create_condition_tree(tree_dict: dict) -> Operator | None:
         error_toast(response)
         return None
 
-    return Operator.from_response(
-        ActionConditionOperatorResponse.model_validate(response.json())
-    )
+    return Operator.from_response(ActionConditionOperatorResponse.model_validate(response.json()))
 
 
 def delete_condition_tree(root_id: int) -> bool:
@@ -444,9 +417,7 @@ def create_condition(condition: Condition) -> Condition | None:
         error_toast(response)
         return None
 
-    return Condition.from_response(
-        ActionConditionResponse.model_validate(response.json())
-    )
+    return Condition.from_response(ActionConditionResponse.model_validate(response.json()))
 
 
 def create_operator(operator: Operator) -> Operator | None:
@@ -458,6 +429,4 @@ def create_operator(operator: Operator) -> Operator | None:
         error_toast(response)
         return None
 
-    return Operator.from_response(
-        ActionConditionOperatorResponse.model_validate(response.json())
-    )
+    return Operator.from_response(ActionConditionOperatorResponse.model_validate(response.json()))

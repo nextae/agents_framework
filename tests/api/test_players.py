@@ -1,8 +1,7 @@
 import pytest
 
-from app.core.database import Session
 from app.models.player import Player, PlayerRequest, PlayerResponse, PlayerUpdateRequest
-from app.services.player import PlayerService
+from app.services.player_service import PlayerService
 
 
 async def test_get_players__success(client, insert, cleanup_db):
@@ -134,8 +133,7 @@ async def test_delete_player__success(client, insert, cleanup_db):
 
     # then
     assert response.status_code == 204
-    async with Session() as db:
-        assert await PlayerService.get_player_by_id(player.id, db) is None
+    assert await PlayerService().get_player_by_id(player.id) is None
 
 
 async def test_delete_player__not_found(client, cleanup_db):

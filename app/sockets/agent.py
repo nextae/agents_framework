@@ -3,15 +3,15 @@ from typing import Any
 from uuid import UUID
 
 import pydantic
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.core.database import Session
 from app.errors.conditions import ConditionEvaluationError
 from app.models import Agent, GlobalState
 from app.models.agent_message import AgentMessage
-from app.services.agent import AgentService
-from app.services.global_state import GlobalStateService
-from app.services.player import PlayerService
+from app.repositories.unit_of_work import UnitOfWork
+from app.services.agent_service import AgentService
+from app.services.global_state_service import GlobalStateService
+from app.services.llm_service import LLMService
+from app.services.player_service import PlayerService
 
 from .models import AgentQueryRequest, AgentQueryResponse
 from .server import sio
@@ -28,19 +28,21 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
     except pydantic.ValidationError:
         return {"error": "Validation error."}
 
-    async with Session() as db:
-        agent = await AgentService.get_populated_agent(request.agent_id, db)
+    async with UnitOfWork() as uow:
+        agent = await AgentService(uow).get_populated_agent(request.agent_id)
         if agent is None:
             return {"error": f"Agent with id {request.agent_id} not found"}
 
-        player = await PlayerService.get_player_by_id(request.player_id, db)
+        player = await PlayerService(uow).get_player_by_id(request.player_id)
         if player is None:
             return {"error": f"Player with id {request.player_id} not found"}
 
-        global_state = await GlobalStateService.get_state(db)
+        global_state = await GlobalStateService(uow).get_state()
 
         try:
-            llm_response = await agent.query(request.query, player, global_state.state, db)
+            llm_response = await LLMService(uow).query_agent(
+                agent, request.query, player, global_state.state
+            )
         except ConditionEvaluationError as e:
             await sio.emit("agent_response_error", {"error": f"Condition evaluation error: {e}"})
             return {"success": False}
@@ -59,9 +61,9 @@ async def query_agent(sid: str, data: Any) -> dict[str, Any]:
             response=response.to_message_response(),
         )
 
-        await AgentService.add_agent_message(message, db)
+        await AgentService(uow).add_agent_message(message)
 
-        result = await _trigger_agents(response.query_id, agent, global_state, response, db)
+        result = await _trigger_agents(response.query_id, agent, global_state, response, uow)
 
     await sio.emit("agent_response_end", {"query_id": str(response.query_id)})
     return {"success": result}
@@ -72,7 +74,7 @@ async def _trigger_agents(
     agent: Agent,
     global_state: GlobalState,
     response: AgentQueryResponse,
-    db: AsyncSession,
+    uow: UnitOfWork,
 ) -> bool:
     """
     Triggers agents recursively.
@@ -85,7 +87,7 @@ async def _trigger_agents(
         if action.triggered_agent_id is None:
             continue
 
-        triggered_agent = await AgentService.get_populated_agent(action.triggered_agent_id, db)
+        triggered_agent = await AgentService(uow).get_populated_agent(action.triggered_agent_id)
         if triggered_agent is None:
             logger.warning(
                 f"Triggered agent with id {action.triggered_agent_id} not found. "
@@ -96,8 +98,8 @@ async def _trigger_agents(
         logger.debug(f"Triggering agent {triggered_agent.name} from action {action.name}")
 
         try:
-            llm_response = await triggered_agent.query(
-                str(action_response.params), agent, global_state.state, db
+            llm_response = await LLMService(uow).query_agent(
+                triggered_agent, str(action_response.params), agent, global_state.state
             )
         except ConditionEvaluationError as e:
             await sio.emit("agent_response_error", {"error": f"Condition evaluation error: {e}"})
@@ -118,12 +120,12 @@ async def _trigger_agents(
             response=response.to_message_response(),
         )
 
-        await AgentService.add_agent_message(message, db)
+        await AgentService(uow).add_agent_message(message)
 
         agents_to_trigger.append((triggered_agent, response))
 
     results = [
-        await _trigger_agents(query_id, agent, global_state, response, db)
+        await _trigger_agents(query_id, agent, global_state, response, uow)
         for agent, response in agents_to_trigger
     ]
     return all(results)

@@ -1,13 +1,11 @@
-import json
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from sqlalchemy import Enum as SAEnum
-from sqlmodel import Column, Field, SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlmodel import Column, Field, Relationship, SQLModel
 
-from app.errors.conditions import ConditionEvaluationError, StateVariableNotFoundError
-from app.models.global_state import StateValue
-from app.services.global_state import GlobalStateService
+if TYPE_CHECKING:
+    from app.models.action_condition_operator import ActionConditionOperator
 
 
 class ComparisonMethod(str, Enum):
@@ -24,112 +22,10 @@ class LogicalOperator(str, Enum):
     OR = "OR"
 
 
-class ActionConditionTreeNode:
-    def __init__(
-        self,
-        node_id: int,
-        logical_operator: LogicalOperator | None,
-        comparison: ComparisonMethod | None,
-        state_variable_name: str | None,
-        expected_value: str | None,
-    ):
-        self.node_id: int = node_id
-        self.logical_operator: LogicalOperator | None = logical_operator
-        self.comparison: ComparisonMethod | None = comparison
-        self.state_variable_name: str | None = state_variable_name
-        self.expected_value: str | None = expected_value
-        self.children: list[ActionConditionTreeNode] = []
-        self.parent: ActionConditionTreeNode = self
-        self.root: ActionConditionTreeNode = self
-
-    def add_child(self, child: "ActionConditionTreeNode"):
-        self.children.append(child)
-        child.parent = self
-        child.root = self.root
-
-    async def evaluate_tree(self, db: AsyncSession) -> bool:
-        return await self.root._evaluate(db)
-
-    async def _evaluate(self, db: AsyncSession) -> bool:
-        if len(self.children) == 0:
-            state_var = await self._get_state_variable(db)
-
-            try:
-                expected_value = json.loads(self.expected_value)
-            except json.JSONDecodeError:
-                expected_value = self.expected_value
-
-            try:
-                match self.comparison:
-                    case ComparisonMethod.EQUAL:
-                        return state_var == expected_value
-                    case ComparisonMethod.NOT_EQUAL:
-                        return state_var != expected_value
-                    case ComparisonMethod.GREATER:
-                        return state_var > expected_value
-                    case ComparisonMethod.LESS:
-                        return state_var < expected_value
-                    case ComparisonMethod.AT_LEAST:
-                        return state_var >= expected_value
-                    case ComparisonMethod.AT_MOST:
-                        return state_var <= expected_value
-            except TypeError:
-                raise ConditionEvaluationError(
-                    f"Comparison '{self.comparison.name}' is not valid for values: "
-                    f"state_var={state_var}, expected_value={expected_value}"
-                )
-        else:
-            results = [await child._evaluate(db) for child in self.children]
-            if self.logical_operator == LogicalOperator.AND:
-                return all(results)
-
-            return any(results)
-
-    async def validate_leaf(self, db: AsyncSession) -> None:
-        if self.logical_operator is not None:
-            raise ValueError("Node must be a leaf to validate")
-
-        await self._evaluate(db)
-
-    async def _get_state_variable(self, db: AsyncSession) -> StateValue:
-        from app.services.agent import AgentService
-
-        if self.state_variable_name.startswith("global"):
-            state = (await GlobalStateService.get_state(db)).state
-        elif self.state_variable_name.startswith("agent-"):
-            agent_id = int(self.state_variable_name.split("/")[0].split("-")[1])
-            agent = await AgentService.get_agent_by_id(agent_id, db)
-            if agent is None:
-                raise ConditionEvaluationError(f"Agent with id {agent_id} not found")
-            state = agent.state
-        else:
-            raise ConditionEvaluationError(
-                f"State variable name '{self.state_variable_name}' is not valid"
-            )
-
-        keys = self.state_variable_name.split("/")[1:]
-        current = state
-
-        try:
-            for key in keys:
-                if isinstance(current, dict):
-                    current = current[key]
-                elif isinstance(current, list):
-                    current = current[int(key)]
-                else:
-                    raise StateVariableNotFoundError(
-                        f"State variable name '{self.state_variable_name}' not found"
-                    )
-            return current
-        except (KeyError, IndexError, ValueError, TypeError) as e:
-            raise StateVariableNotFoundError(
-                f"State variable name '{self.state_variable_name}' not found"
-            ) from e
-
-
 class ActionConditionBase(SQLModel):
     parent_id: int = Field(foreign_key="actionconditionoperator.id")
     root_id: int = Field(foreign_key="actionconditionoperator.id")
+    state_agent_id: int | None = Field(default=None, foreign_key="agent.id")
     state_variable_name: str
     comparison: ComparisonMethod = Field(
         sa_column=Column(SAEnum(ComparisonMethod, native_enum=False), nullable=False)
@@ -140,17 +36,13 @@ class ActionConditionBase(SQLModel):
 class ActionCondition(ActionConditionBase, table=True):
     id: int = Field(default=None, primary_key=True)
 
-    async def validate_condition(self, db: AsyncSession) -> None:
-        await self.to_tree_node().validate_leaf(db)
-
-    def to_tree_node(self) -> ActionConditionTreeNode:
-        return ActionConditionTreeNode(
-            self.id,
-            None,
-            self.comparison,
-            self.state_variable_name,
-            self.expected_value,
-        )
+    parent: "ActionConditionOperator" = Relationship(
+        back_populates="conditions",
+        sa_relationship_kwargs={"foreign_keys": "[ActionCondition.parent_id]"},
+    )
+    root: "ActionConditionOperator" = Relationship(
+        sa_relationship_kwargs={"foreign_keys": "[ActionCondition.root_id]"}
+    )
 
 
 class ActionConditionRequest(ActionConditionBase):
@@ -160,6 +52,7 @@ class ActionConditionRequest(ActionConditionBase):
 class ActionConditionUpdateRequest(SQLModel):
     parent_id: int | None = None
     root_id: int | None = None
+    state_agent_id: int | None = None
     state_variable_name: str | None = None
     comparison: ComparisonMethod | None = None
     expected_value: str | None = None
