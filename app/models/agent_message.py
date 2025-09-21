@@ -1,10 +1,9 @@
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from langchain_core.messages import AIMessage, HumanMessage
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import TIMESTAMP, Column, Field, Relationship, SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
 from typing_extensions import TypedDict
 
 if TYPE_CHECKING:
@@ -38,26 +37,24 @@ class AgentMessage(SQLModel, table=True):
         sa_relationship_kwargs={"foreign_keys": "[AgentMessage.agent_id]"},
     )
 
-    async def _get_caller(self, db: AsyncSession) -> "Agent | Player":
-        """Gets the caller of the message."""
+    def to_llm_messages(self, caller: Optional["Agent | Player"]) -> tuple[HumanMessage, AIMessage]:
+        """
+        Converts the agent message to LangChain LLM messages.
 
-        if self.caller_agent_id:
-            from app.services.agent import AgentService
+        Args:
+            caller (Agent | Player): The caller of the message.
 
-            return await AgentService.get_agent_by_id(self.caller_agent_id, db)
-
-        from app.services.player import PlayerService
-
-        return await PlayerService.get_player_by_id(self.caller_player_id, db)
-
-    async def to_llm_messages(self, db: AsyncSession) -> tuple[HumanMessage, AIMessage]:
-        """Converts the agent message to LangChain LLM messages."""
-
-        caller = await self._get_caller(db)
-        assert caller is not None, "Caller not found."
+        Returns:
+            tuple[HumanMessage, AIMessage]: The converted messages.
+        """
 
         human_message = HumanMessage(
-            content=str({"caller": caller.to_details(), "query": self.query})
+            content=str(
+                {
+                    "caller": caller.to_details() if caller is not None else "Unknown",
+                    "query": self.query,
+                }
+            )
         )
         ai_message = AIMessage(content=str(self.response))
         return human_message, ai_message

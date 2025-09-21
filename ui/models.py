@@ -32,12 +32,8 @@ __all__ = (
 class AgentForm(BaseModel):
     id: int = Field(..., title="ID", readOnly=True)
     name: str = Field(..., description="The name of the agent.")
-    description: str = Field(
-        ..., description="A description of the agent.", format="multi-line"
-    )
-    instructions: str = Field(
-        ..., description="Instructions for the agent.", format="multi-line"
-    )
+    description: str = Field(..., description="A description of the agent.", format="multi-line")
+    instructions: str = Field(..., description="Instructions for the agent.", format="multi-line")
 
 
 class Agent(AgentForm):
@@ -90,9 +86,7 @@ class ActionParam(ActionParamForm):
 class ActionForm(BaseModel):
     id: int = Field(..., title="ID", readOnly=True)
     name: str = Field(..., description="The name of the action.")
-    description: str = Field(
-        ..., description="The description of the action.", format="multi-line"
-    )
+    description: str = Field(..., description="The description of the action.", format="multi-line")
 
 
 class Action(ActionForm):
@@ -119,23 +113,21 @@ class Player(BaseModel):
     description: str = Field(
         ...,
         description=(
-            "Description of the player.\n\n"
-            "This is what agents will know about this player."
+            "Description of the player.\n\nThis is what agents will know about this player."
         ),
         format="multi-line",
     )
 
     @classmethod
     def from_response(cls, response: PlayerResponse) -> "Player":
-        return cls(
-            id=response.id, name=response.name, description=response.description or ""
-        )
+        return cls(id=response.id, name=response.name, description=response.description or "")
 
 
 class Condition(BaseModel):
     id: int = Field(default=0, title="ID", readOnly=True)
     root_id: int = Field(default=0, title="Root ID")
     parent_id: int = Field(default=0, title="Parent ID")
+    state_agent_id: int | None = Field(default=None, title="State Agent ID")
     state_variable_name: str
     comparison: ComparisonMethod
     expected_value: str
@@ -162,23 +154,20 @@ class Condition(BaseModel):
         data = self.model_dump()
 
         expected_value = (
-            self.expected_value
-            if not self.is_expected_value_text()
-            else f'"{self.expected_value}"'
+            self.expected_value if not self.is_expected_value_text() else f'"{self.expected_value}"'
         )
         is_valid = (
-            self.state_variable_name.startswith("global")
+            self.state_agent_id is None
             and agent is None
-            or (self.state_variable_name.startswith("agent") and agent is not None)
+            or (agent is not None and agent.id == self.state_agent_id)
         )
         state_text = (
             ("Global" if agent is None else f"Agent: {agent.name}")
             if is_valid
             else "Agent not found!"
         )
-        state_variable = self.state_variable_name.split("/", 1)[1]
         data["content"] = (
-            f"{state_variable} {self.comparison.value} {expected_value}"
+            f"{self.state_variable_name} {self.comparison.value} {expected_value}"
             f'<p style="color: {"#9FA7BC" if is_valid else "#ED4337"}">{state_text}</p>'
         )
         data["type"] = "condition"

@@ -1,12 +1,11 @@
 import pytest
 
-from app.core.database import Session
-from app.models import ActionParam, AgentMessage, AgentsActionsMatch, Player
+from app.models import ActionParam, AgentMessage, Player
 from app.models.action import Action
 from app.models.action_param import ActionParamType
 from app.models.agent import Agent, AgentRequest, AgentResponse, AgentUpdateRequest
 from app.models.agent_message import QueryResponseDict
-from app.services.agent import AgentService
+from app.services.agent_service import AgentService
 
 
 async def test_get_agents__success(client, insert, cleanup_db):
@@ -156,8 +155,7 @@ async def test_delete_agent__success(client, insert, cleanup_db):
 
     # then
     assert response.status_code == 204
-    async with Session() as db:
-        assert await AgentService.get_agent_by_id(agent.id, db) is None
+    assert await AgentService().get_agent_by_id(agent.id) is None
 
 
 async def test_delete_agent__not_found(client, cleanup_db):
@@ -272,15 +270,12 @@ async def test_assign_action_to_agent__success(client, insert, cleanup_db):
     agent, action = await insert(agent, action)
 
     # when
-    response = await client.post(
-        "/agents/assign_action", params={"agent_id": agent.id, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/{action.id}/assign")
 
     # then
     assert response.status_code == 200
-    data = response.json()
-    assert data["agent_id"] == agent.id
-    assert data["action_id"] == action.id
+    agent.actions.append(action)
+    assert Agent.model_validate(response.json()) == agent
 
 
 async def test_assign_action_to_agent__agent_not_found(client, insert, cleanup_db):
@@ -289,9 +284,7 @@ async def test_assign_action_to_agent__agent_not_found(client, insert, cleanup_d
     action = await insert(action)
 
     # when
-    response = await client.post(
-        "/agents/assign_action", params={"agent_id": 999, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/999/actions/{action.id}/assign")
 
     # then
     assert response.status_code == 404
@@ -304,9 +297,7 @@ async def test_assign_action_to_agent__action_not_found(client, insert, cleanup_
     agent = await insert(agent)
 
     # when
-    response = await client.post(
-        "/agents/assign_action", params={"agent_id": agent.id, "action_id": 999}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/999/assign")
 
     # then
     assert response.status_code == 404
@@ -315,16 +306,12 @@ async def test_assign_action_to_agent__action_not_found(client, insert, cleanup_
 
 async def test_assign_action_to_agent__conflict(client, insert, cleanup_db):
     # given
-    agent = Agent(name="Agent")
     action = Action(name="Action")
-    agent, action = await insert(agent, action)
-    match = AgentsActionsMatch(agent_id=agent.id, action_id=action.id)
-    await insert(match)
+    agent = Agent(name="Agent", actions=[action])
+    agent = await insert(agent)
 
     # when
-    response = await client.post(
-        "/agents/assign_action", params={"agent_id": agent.id, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/{action.id}/assign")
 
     # then
     assert response.status_code == 409
@@ -336,19 +323,17 @@ async def test_assign_action_to_agent__conflict(client, insert, cleanup_db):
 
 async def test_remove_action_from_agent__success(client, insert, cleanup_db):
     # given
-    agent = Agent(name="Agent")
     action = Action(name="Action")
-    agent, action = await insert(agent, action)
-    match = AgentsActionsMatch(agent_id=agent.id, action_id=action.id)
-    await insert(match)
+    agent = Agent(name="Agent", actions=[action])
+    agent = await insert(agent)
 
     # when
-    response = await client.post(
-        "/agents/remove_action", params={"agent_id": agent.id, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/{action.id}/remove")
 
     # then
-    assert response.status_code == 200 or response.status_code == 204
+    assert response.status_code == 200
+    agent.actions.remove(action)
+    assert Agent.model_validate(response.json()) == agent
 
 
 async def test_remove_action_from_agent__agent_not_found(client, insert, cleanup_db):
@@ -357,9 +342,7 @@ async def test_remove_action_from_agent__agent_not_found(client, insert, cleanup
     action = await insert(action)
 
     # when
-    response = await client.post(
-        "/agents/remove_action", params={"agent_id": 999, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/999/actions/{action.id}/remove")
 
     # then
     assert response.status_code == 404
@@ -372,9 +355,7 @@ async def test_remove_action_from_agent__action_not_found(client, insert, cleanu
     agent = await insert(agent)
 
     # when
-    response = await client.post(
-        "/agents/remove_action", params={"agent_id": agent.id, "action_id": 999}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/999/remove")
 
     # then
     assert response.status_code == 404
@@ -388,12 +369,10 @@ async def test_remove_action_from_agent__not_assigned(client, insert, cleanup_db
     agent, action = await insert(agent, action)
 
     # when
-    response = await client.post(
-        "/agents/remove_action", params={"agent_id": agent.id, "action_id": action.id}
-    )
+    response = await client.post(f"/agents/{agent.id}/actions/{action.id}/remove")
 
     # then
-    assert response.status_code == 404
+    assert response.status_code == 409
     assert (
         f"Action with id {action.id} hasn't been assigned to agent with id {agent.id}"
         in response.text

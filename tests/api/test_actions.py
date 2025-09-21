@@ -1,6 +1,5 @@
 import pytest
 
-from app.core.database import Session
 from app.models import Action, ActionParam, Agent, GlobalState
 from app.models.action import (
     ActionEvaluationResult,
@@ -10,7 +9,8 @@ from app.models.action import (
 )
 from app.models.action_condition import ActionCondition, ComparisonMethod
 from app.models.action_param import ActionParamType
-from app.services.action import ActionService
+from app.services.action_service import ActionService
+from app.services.global_state_service import GlobalStateService
 
 
 async def test_get_actions__success(client, insert, cleanup_db):
@@ -240,8 +240,7 @@ async def test_delete_action__success(client, insert, cleanup_db):
 
     # then
     assert response.status_code == 204
-    async with Session() as db:
-        assert await ActionService.get_action_by_id(action.id, db) is None
+    assert await ActionService().get_action_by_id(action.id) is None
 
 
 async def test_delete_action__not_found(client, cleanup_db):
@@ -276,13 +275,13 @@ async def test_evaluate_action_conditions__with_conditions__success(
 ):
     # given
     global_state = GlobalState(id=1, state={"number": number_value})
-    await insert(global_state)
+    await GlobalStateService().update_state(global_state)
 
     expected_value = 10
     condition = ActionCondition(
         parent_id=root_operator.id,
         root_id=root_operator.id,
-        state_variable_name="global/number",
+        state_variable_name="number",
         comparison=ComparisonMethod.GREATER,
         expected_value=str(expected_value),
     )
@@ -310,49 +309,6 @@ async def test_evaluate_action_conditions__action_not_found(client, cleanup_db):
     assert f"Action with id {action_id} not found" in response.text
 
 
-async def test_evaluate_action_conditions__invalid_state_variable(
-    client, insert, root_operator, cleanup_db
-):
-    # given
-    condition = ActionCondition(
-        parent_id=root_operator.id,
-        root_id=root_operator.id,
-        state_variable_name="invalid/state_var",
-        comparison=ComparisonMethod.EQUAL,
-        expected_value='"some_value"',
-    )
-    await insert(condition)
-
-    # when
-    response = await client.post(f"/actions/{root_operator.action_id}/evaluate_conditions")
-
-    # then
-    assert response.status_code == 409
-    assert f"State variable name '{condition.state_variable_name}' is not valid" in response.text
-
-
-async def test_evaluate_action_conditions__agent_not_found(
-    client, insert, root_operator, cleanup_db
-):
-    # given
-    agent_id = 999
-    condition = ActionCondition(
-        parent_id=root_operator.id,
-        root_id=root_operator.id,
-        state_variable_name=f"agent-{agent_id}/state_var",
-        comparison=ComparisonMethod.EQUAL,
-        expected_value='"some_value"',
-    )
-    await insert(condition)
-
-    # when
-    response = await client.post(f"/actions/{root_operator.action_id}/evaluate_conditions")
-
-    # then
-    assert response.status_code == 409
-    assert f"Agent with id {agent_id} not found" in response.text
-
-
 async def test_evaluate_action_conditions__variable_not_found(
     client, insert, root_operator, cleanup_db
 ):
@@ -360,7 +316,7 @@ async def test_evaluate_action_conditions__variable_not_found(
     condition = ActionCondition(
         parent_id=root_operator.id,
         root_id=root_operator.id,
-        state_variable_name="global/missing_var",
+        state_variable_name="missing_var",
         comparison=ComparisonMethod.EQUAL,
         expected_value='"some_value"',
     )
@@ -379,12 +335,12 @@ async def test_evaluate_action_conditions__invalid_comparison(
 ):
     # given
     global_state = GlobalState(id=1, state={"text": "hello"})
-    await insert(global_state)
+    await GlobalStateService().update_state(global_state)
 
     condition = ActionCondition(
         parent_id=root_operator.id,
         root_id=root_operator.id,
-        state_variable_name="global/text",
+        state_variable_name="text",
         comparison=ComparisonMethod.AT_LEAST,
         expected_value="true",
     )

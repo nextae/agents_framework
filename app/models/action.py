@@ -2,14 +2,12 @@ from typing import TYPE_CHECKING, Optional
 
 from pydantic import BaseModel, create_model
 from sqlmodel import Field, Relationship, SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
 
 from app.models.action_param import ActionParam, ActionParamResponse
 from app.models.agents_actions_match import AgentsActionsMatch
 
 if TYPE_CHECKING:
     from app.models import Agent
-    from app.services.action_condition import ActionConditionTreeNode
 
 
 class ActionBase(SQLModel):
@@ -30,7 +28,12 @@ class Action(ActionBase, table=True):
     agents: list["Agent"] = Relationship(back_populates="actions", link_model=AgentsActionsMatch)
 
     def to_structured_output(self) -> type[BaseModel]:
-        """Converts the action to a structured output model."""
+        """
+        Creates a Pydantic model for the structured output of the action.
+
+        Returns:
+            type[BaseModel]: The created Pydantic model.
+        """
 
         return create_model(
             self.name,
@@ -42,20 +45,6 @@ class Action(ActionBase, table=True):
                 for param in self.params
             },
         )
-
-    async def _get_condition_tree(self, db: AsyncSession) -> "ActionConditionTreeNode | None":
-        from app.services.action_condition import ActionConditionService
-
-        conditions = await ActionConditionService.get_all_conditions_by_action_id(self.id, db)
-        if not conditions:
-            return None
-
-        tree = ActionConditionService.build_condition_tree(conditions)
-        return tree
-
-    async def evaluate_conditions(self, db: AsyncSession) -> bool:
-        tree = await self._get_condition_tree(db)
-        return await tree.evaluate_tree(db) if tree else True
 
 
 class ActionRequest(ActionBase):

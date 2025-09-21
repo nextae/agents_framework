@@ -1,6 +1,5 @@
 import os
-from collections.abc import AsyncGenerator, Callable, Generator
-from typing import TypeVar
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
@@ -9,8 +8,6 @@ from alembic import command as alembic_command
 from alembic.config import Config as AlembicConfig
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio.engine import create_async_engine
-from sqlalchemy.ext.asyncio.session import AsyncSession
-from sqlmodel import SQLModel
 from testcontainers.postgres import PostgresContainer
 
 from app.core.database import Session
@@ -22,10 +19,11 @@ from app.models import (
     ActionParam,
     Agent,
     AgentMessage,
-    AgentsActionsMatch,
     GlobalState,
     Player,
 )
+from app.repositories.base_repository import BaseRepository, ModelType
+from app.repositories.unit_of_work import UnitOfWork
 
 POSTGRES_USER = os.getenv("POSTGRES_USER")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
@@ -87,100 +85,27 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
         yield client
 
 
-async def _insert_action(session: AsyncSession, action: Action) -> Action:
-    session.add(action)
-    await session.flush()
-    await session.refresh(action)
-    return action
-
-
-async def _insert_action_condition(
-    session: AsyncSession, condition: ActionCondition
-) -> ActionCondition:
-    session.add(condition)
-    await session.flush()
-    await session.refresh(condition)
-    return condition
-
-
-async def _insert_action_condition_operator(
-    session: AsyncSession, condition_operator: ActionConditionOperator
-) -> ActionConditionOperator:
-    session.add(condition_operator)
-    await session.flush()
-    await session.refresh(condition_operator)
-    return condition_operator
-
-
-async def _insert_action_param(session: AsyncSession, action_param: ActionParam) -> ActionParam:
-    session.add(action_param)
-    await session.flush()
-    await session.refresh(action_param)
-    return action_param
-
-
-async def _insert_agent(session: AsyncSession, agent: Agent) -> Agent:
-    session.add(agent)
-    await session.flush()
-    await session.refresh(agent)
-    return agent
-
-
-async def _insert_agent_message(session: AsyncSession, agent_message: AgentMessage) -> AgentMessage:
-    session.add(agent_message)
-    await session.flush()
-    await session.refresh(agent_message)
-    return agent_message
-
-
-async def _insert_agents_actions_match(
-    session: AsyncSession, match: AgentsActionsMatch
-) -> AgentsActionsMatch:
-    session.add(match)
-    await session.flush()
-    await session.refresh(match)
-    return match
-
-
-async def _insert_global_state(session: AsyncSession, state: GlobalState) -> GlobalState:
-    state = await session.merge(state)
-    await session.flush()
-    await session.refresh(state)
-    return state
-
-
-async def _insert_player(session: AsyncSession, player: Player) -> Player:
-    session.add(player)
-    await session.flush()
-    await session.refresh(player)
-    return player
-
-
-ModelType = TypeVar("ModelType", bound=SQLModel)
-
-
-INSERT_FUNCTIONS: dict[type[SQLModel], Callable] = {
-    Action: _insert_action,
-    ActionCondition: _insert_action_condition,
-    ActionConditionOperator: _insert_action_condition_operator,
-    ActionParam: _insert_action_param,
-    Agent: _insert_agent,
-    AgentMessage: _insert_agent_message,
-    AgentsActionsMatch: _insert_agents_actions_match,
-    GlobalState: _insert_global_state,
-    Player: _insert_player,
+REPOSITORY_ATTRIBUTES = {
+    Action: "actions",
+    ActionCondition: "conditions",
+    ActionConditionOperator: "operators",
+    ActionParam: "params",
+    Agent: "agents",
+    AgentMessage: "messages",
+    GlobalState: "state",
+    Player: "players",
 }
 
 
 @pytest.fixture
 def insert():
     async def _insert(*models: ModelType) -> list[ModelType] | ModelType:
-        async with Session() as session:
+        async with UnitOfWork() as uow:
             inserted_models = []
             for model in models:
-                insert_function = INSERT_FUNCTIONS[type(model)]
-                inserted_models.append(await insert_function(session, model))
-            await session.commit()
+                repository: BaseRepository = getattr(uow, REPOSITORY_ATTRIBUTES[type(model)])
+                inserted_models.append(await repository.create(model))
+
         return inserted_models[0] if len(inserted_models) == 1 else inserted_models
 
     return _insert

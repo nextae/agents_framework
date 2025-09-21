@@ -1,7 +1,9 @@
-from sqlalchemy import Enum as SAEnum
-from sqlmodel import Column, Field, SQLModel
+from typing import Optional
 
-from app.models.action_condition import ActionConditionTreeNode, LogicalOperator
+from sqlalchemy import Enum as SAEnum
+from sqlmodel import Column, Field, Relationship, SQLModel
+
+from app.models.action_condition import ActionCondition, LogicalOperator
 
 
 class ActionConditionOperatorBase(SQLModel):
@@ -18,8 +20,23 @@ class ActionConditionOperator(ActionConditionOperatorBase, table=True):
     )
     root_id: int = Field(default=None, nullable=True, foreign_key="actionconditionoperator.id")
 
-    def to_tree_node(self):
-        return ActionConditionTreeNode(self.id, self.logical_operator, None, None, None)
+    conditions: list[ActionCondition] = Relationship(
+        back_populates="parent",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "[ActionCondition.parent_id]"},
+    )
+    operators: list["ActionConditionOperator"] = Relationship(
+        back_populates="parent",
+        cascade_delete=True,
+        sa_relationship_kwargs={"foreign_keys": "[ActionConditionOperator.parent_id]"},
+    )
+    parent: Optional["ActionConditionOperator"] = Relationship(
+        back_populates="operators",
+        sa_relationship_kwargs={
+            "remote_side": "ActionConditionOperator.id",
+            "foreign_keys": "[ActionConditionOperator.parent_id]",
+        },
+    )
 
     def is_root(self) -> bool:
         return self.root_id == self.id

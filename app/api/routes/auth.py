@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from app.api.dependencies import Credentials
 from app.core.auth import encode_access_token, is_valid_user
 
-auth_router = APIRouter()
+auth_router = APIRouter(tags=["auth"])
 
 
 class TokenResponse(BaseModel):

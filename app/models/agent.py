@@ -1,15 +1,17 @@
-from pydantic import BaseModel, create_model
+from typing import TYPE_CHECKING
+
+from pydantic import create_model
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
-from sqlmodel.ext.asyncio.session import AsyncSession
 
-from app.llm.chain import create_chain
-from app.llm.models import AgentDetails, ChainInput, ChainOutput
+from app.llm.models import AgentDetails, ChainOutput
 from app.models.action import Action, ActionResponse
 from app.models.agent_message import AgentMessage
 from app.models.agents_actions_match import AgentsActionsMatch
 from app.models.global_state import State
-from app.models.player import Player
+
+if TYPE_CHECKING:
+    pass
 
 CONVERSATION_HISTORY_PRIMARY_JOIN = """
 or_(
@@ -43,8 +45,17 @@ class Agent(AgentBase, table=True):
         sa_relationship_kwargs={"lazy": "selectin"},
     )
 
-    async def to_structured_output(self, db: AsyncSession) -> type[BaseModel]:
-        """Creates a Pydantic model for the structured output of the agent."""
+    def to_structured_output(self, available_actions: list[Action]) -> type[ChainOutput]:
+        """
+        Creates a Pydantic model representing the structured output of the agent's response.
+
+        Args:
+            available_actions (list[Action]):
+                The list of actions that have been evaluated and are available.
+
+        Returns:
+            type[ChainOutput]: The Pydantic model representing the structured output.
+        """
 
         actions_model = create_model(
             "Actions",
@@ -53,8 +64,7 @@ class Agent(AgentBase, table=True):
                     action.to_structured_output() | None,
                     Field(..., description=action.description),
                 )
-                for action in self.actions
-                if await action.evaluate_conditions(db)
+                for action in available_actions
             },
         )
 
@@ -72,30 +82,6 @@ class Agent(AgentBase, table=True):
             agent_id=self.id,
             agent_description=self.description or "",
         )
-
-    async def query(
-        self,
-        query: str,
-        caller: "Player | Agent",
-        global_state: State,
-        db: AsyncSession,
-    ) -> ChainOutput:
-        """Queries the agent."""
-
-        chain_input = ChainInput(
-            query=str({"caller": caller.to_details(), "query": query}),
-            instructions=self.instructions or "",
-            global_state=global_state,
-            agent_state=self.state,
-            action_agents={
-                action.name: action.triggered_agent.to_details()
-                for action in self.actions
-                if action.triggered_agent is not None
-            },
-        )
-
-        chain = await create_chain(self, db)
-        return await chain.ainvoke(chain_input)
 
 
 class AgentRequest(AgentBase):
