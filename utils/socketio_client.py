@@ -89,7 +89,11 @@ def login() -> str:
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
     response.raise_for_status()
-    return response.json().get("access_token")
+    token = response.json().get("access_token")
+    if not token:
+        raise RuntimeError("No access token found in the response.")
+
+    return token
 
 
 if __name__ == "__main__":

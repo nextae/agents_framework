@@ -59,7 +59,11 @@ class UnitOfWork:
         if self._depth > 0:
             return
 
-        await self.commit()
+        if exc_val:
+            await self.rollback()
+        else:
+            await self.commit()
+
         await self._session.__aexit__(exc_type, exc_val, exc_tb)
 
     async def commit(self) -> None:

@@ -94,12 +94,13 @@ class ActionConditionService(BaseService):
         Validate the IDs of the given operator.
 
         Args:
-            operator (ActionConditionOperator | ActionConditionOperatorUpdateRequest): The operator to validate.
+            operator (ActionConditionOperator | ActionConditionOperatorUpdateRequest):
+                The operator to validate.
 
         Raises:
             NotFoundError: If the action, parent, or root operator does not exist.
             ConflictError: If the root operator is not a root.
-        """  # noqa: E501
+        """
 
         async with self.unit_of_work as uow:
             await self._validate_parent_and_root(operator.parent_id, operator.root_id)
@@ -414,16 +415,15 @@ class ActionConditionService(BaseService):
             ConflictError: If root is not a root operator.
         """
 
-        async with self.unit_of_work:
-            if parent_id is not None:
-                parent = await self.get_condition_operator_by_id(parent_id)
-                if parent is None:
-                    raise NotFoundError(f"Operator with id {parent_id} not found")
+        if parent_id is not None:
+            parent = await self.get_condition_operator_by_id(parent_id)
+            if parent is None:
+                raise NotFoundError(f"Operator with id {parent_id} not found")
 
-            if root_id is not None:
-                root = await self.get_condition_operator_by_id(root_id)
-                if root is None:
-                    raise NotFoundError(f"Root with id {root_id} not found")
+        if root_id is not None:
+            root = await self.get_condition_operator_by_id(root_id)
+            if root is None:
+                raise NotFoundError(f"Root with id {root_id} not found")
 
-                if not root.is_root():
-                    raise ConflictError(f"Operator with id {root_id} is not a root")
+            if not root.is_root():
+                raise ConflictError(f"Operator with id {root_id} is not a root")
