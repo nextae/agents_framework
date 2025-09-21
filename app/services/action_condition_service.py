@@ -1,5 +1,6 @@
 from app.errors.api import ConflictError, NotFoundError
 from app.errors.conditions import ConditionEvaluationError
+from app.models.action import Action, ActionEvaluationResult
 from app.models.action_condition import (
     ActionCondition,
     ActionConditionRequest,
@@ -13,8 +14,6 @@ from app.models.action_condition_operator import (
 )
 from app.models.action_condition_tree import ActionConditionTree, ActionConditionTreeNode
 
-from ..models.action import Action, ActionEvaluationResult
-from .action_service import ActionService
 from .agent_service import AgentService
 from .base_service import BaseService
 from .global_state_service import GlobalStateService
@@ -106,7 +105,7 @@ class ActionConditionService(BaseService):
             await self._validate_parent_and_root(operator.parent_id, operator.root_id)
 
             if operator.action_id is not None:
-                action = await ActionService(uow).get_action_by_id(operator.action_id)
+                action = await uow.actions.find_by_id(operator.action_id)
                 if action is None:
                     raise NotFoundError(f"Action with id {operator.action_id} not found")
 
@@ -126,7 +125,7 @@ class ActionConditionService(BaseService):
         operator = ActionConditionOperator.model_validate(tree_request)
 
         async with self.unit_of_work as uow:
-            action = await ActionService(uow).get_action_by_id(operator.action_id)
+            action = await uow.actions.find_by_id(operator.action_id)
             if action is None:
                 raise NotFoundError(f"Action with id {operator.action_id} not found")
 
@@ -279,7 +278,7 @@ class ActionConditionService(BaseService):
             if not operator.is_root():
                 raise ConflictError(f"Operator with id {root_id} is not a root")
 
-            action = await ActionService(uow).get_action_by_id(action_id)
+            action = await uow.actions.find_by_id(action_id)
             if action is None:
                 raise NotFoundError(f"Action with id {action_id} not found")
 
@@ -377,7 +376,7 @@ class ActionConditionService(BaseService):
         """
 
         async with self.unit_of_work as uow:
-            action = await ActionService(uow).get_action_by_id(action_id)
+            action = await uow.actions.find_by_id(action_id)
             if action is None:
                 raise NotFoundError(f"Action with id {action_id} not found")
 

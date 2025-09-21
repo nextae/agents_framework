@@ -1,12 +1,9 @@
 from sqlalchemy.exc import IntegrityError
 
 from app.errors.api import ConflictError, NotFoundError
-from app.models.action import (
-    Action,
-    ActionRequest,
-    ActionUpdateRequest,
-)
+from app.models.action import Action, ActionRequest, ActionUpdateRequest
 
+from .action_condition_service import ActionConditionService
 from .base_service import BaseService
 
 
@@ -26,11 +23,7 @@ class ActionService(BaseService):
 
         async with self.unit_of_work as uow:
             if action_request.triggered_agent_id is not None:
-                from app.services.agent_service import AgentService
-
-                triggered_agent = await AgentService(uow).get_agent_by_id(
-                    action_request.triggered_agent_id
-                )
+                triggered_agent = await uow.agents.find_by_id(action_request.triggered_agent_id)
                 if triggered_agent is None:
                     raise NotFoundError(
                         f"Agent with id {action_request.triggered_agent_id} not found"
@@ -112,8 +105,6 @@ class ActionService(BaseService):
         """
 
         async with self.unit_of_work as uow:
-            from app.services.action_condition_service import ActionConditionService
-
             action = await self.get_action_by_id(action_id)
             if not action:
                 return None
@@ -125,18 +116,3 @@ class ActionService(BaseService):
                 await condition_service.delete_condition_operator(root_operator.id)
 
             await uow.actions.delete(action)
-
-    async def agent_has_trigger_actions(self, agent_id: int) -> bool:
-        """
-        Check if an agent has any trigger actions.
-
-        Args:
-            agent_id (int): The ID of the agent.
-
-        Returns:
-            bool: True if the agent has trigger actions, False otherwise.
-        """
-
-        async with self.unit_of_work as uow:
-            action = await uow.actions.find_first_by_triggered_agent_id(agent_id)
-            return action is not None

@@ -3,7 +3,6 @@ from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage
 from app.models.global_state import State
 
-from .action_service import ActionService
 from .base_service import BaseService
 
 
@@ -78,7 +77,7 @@ class AgentService(BaseService):
             if agent is None:
                 raise NotFoundError(f"Agent with id {agent_id} not found")
 
-            action = await ActionService(uow).get_action_by_id(action_id)
+            action = await uow.actions.find_by_id(action_id)
             if action is None:
                 raise NotFoundError(f"Action with id {action_id} not found")
 
@@ -107,7 +106,7 @@ class AgentService(BaseService):
             if agent is None:
                 raise NotFoundError(f"Agent with id {agent_id} not found")
 
-            action = await ActionService(uow).get_action_by_id(action_id)
+            action = await uow.actions.find_by_id(action_id)
             if action is None:
                 raise NotFoundError(f"Action with id {action_id} not found")
 
@@ -154,7 +153,7 @@ class AgentService(BaseService):
             if not agent:
                 return None
 
-            if await ActionService(uow).agent_has_trigger_actions(agent_id):
+            if await uow.actions.find_first_by_triggered_agent_id(agent_id) is not None:
                 raise ConflictError(f"Agent with id {agent_id} has existing trigger actions")
 
             await uow.agents.delete(agent)

@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from pydantic import create_model
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
@@ -9,9 +7,6 @@ from app.models.action import Action, ActionResponse
 from app.models.agent_message import AgentMessage
 from app.models.agents_actions_match import AgentsActionsMatch
 from app.models.global_state import State
-
-if TYPE_CHECKING:
-    pass
 
 CONVERSATION_HISTORY_PRIMARY_JOIN = """
 or_(

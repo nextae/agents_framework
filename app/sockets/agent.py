@@ -10,9 +10,9 @@ from app.models.agent_message import AgentMessage
 from app.repositories.unit_of_work import UnitOfWork
 from app.services.agent_service import AgentService
 from app.services.global_state_service import GlobalStateService
+from app.services.llm_service import LLMService
 from app.services.player_service import PlayerService
 
-from ..services.llm_service import LLMService
 from .models import AgentQueryRequest, AgentQueryResponse
 from .server import sio
 
