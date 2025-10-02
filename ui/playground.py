@@ -187,7 +187,7 @@ def render_state() -> None:
                 updated = sockets.update_agent_state(agent.id, state, internal=False)
                 if updated:
                     st.toast(
-                        "Agent state updated successfully.",
+                        "Agent external state updated successfully.",
                         icon=":material/done:",
                     )
                     st.session_state.edit_mode_agent_external_state = False
