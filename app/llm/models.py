@@ -9,6 +9,7 @@ class AgentDetails(TypedDict):
     agent_id: int
     agent_name: str
     agent_description: str
+    agent_external_state: State
 
 
 class PlayerDetails(TypedDict):
@@ -21,7 +22,8 @@ class ChainInput(TypedDict):
     query: str
     instructions: str
     global_state: State
-    agent_state: State
+    agent_internal_state: State
+    agent_external_state: State
     action_agents: dict[str, AgentDetails]
 
 

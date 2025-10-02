@@ -1,3 +1,5 @@
+from functools import cached_property
+
 from pydantic import create_model
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlmodel import Column, Field, Relationship, SQLModel
@@ -24,7 +26,8 @@ class AgentBase(SQLModel):
 
 class Agent(AgentBase, table=True):
     id: int = Field(default=None, primary_key=True)
-    state: State = Field(default={}, sa_column=Column(JSONB))
+    external_state: State = Field(default={}, sa_column=Column(JSONB, nullable=False))
+    internal_state: State = Field(default={}, sa_column=Column(JSONB, nullable=False))
 
     conversation_history: list[AgentMessage] = Relationship(
         back_populates="agent",
@@ -40,9 +43,21 @@ class Agent(AgentBase, table=True):
         sa_relationship_kwargs={"lazy": "selectin"},
     )
 
+    @cached_property
+    def combined_state(self) -> State:
+        """
+        Combine the internal and external state of the agent.
+        In case of key conflicts, the internal state takes precedence.
+
+        Returns:
+            State: The combined state of the agent.
+        """
+
+        return self.external_state | self.internal_state
+
     def to_structured_output(self, available_actions: list[Action]) -> type[ChainOutput]:
         """
-        Creates a Pydantic model representing the structured output of the agent's response.
+        Create a Pydantic model representing the structured output of the agent's response.
 
         Args:
             available_actions (list[Action]):
@@ -76,6 +91,7 @@ class Agent(AgentBase, table=True):
             agent_name=self.name,
             agent_id=self.id,
             agent_description=self.description or "",
+            agent_external_state=self.external_state,
         )
 
 

@@ -6,7 +6,12 @@ from app.repositories.unit_of_work import UnitOfWork
 from app.services.agent_service import AgentService
 from app.services.global_state_service import GlobalStateService
 
-from .models import UpdateAgentStateRequest, UpdateStateRequest
+from .models import (
+    AgentCombinedStateRequest,
+    AgentStateRequest,
+    UpdateAgentStateRequest,
+    UpdateStateRequest,
+)
 from .server import sio
 
 
@@ -49,7 +54,12 @@ async def update_agent_state(sid: str, data: Any) -> dict[str, Any]:
         if agent is None:
             return {"error": f"Agent with id {request.agent_id} not found"}
 
-        await AgentService(uow).update_agent_state(agent, request.state)
+        if request.internal:
+            agent.internal_state = request.state
+        else:
+            agent.external_state = request.state
+
+        await uow.agents.update(agent)
 
     return request.model_dump()
 
@@ -59,13 +69,30 @@ async def get_agent_state(sid: str, data: Any) -> dict[str, Any]:
     """Gets an Agent's state."""
 
     try:
-        agent_id = int(data)
-    except (ValueError, TypeError):
+        request = AgentStateRequest.model_validate(data)
+    except pydantic.ValidationError:
         return {"error": "Validation error."}
 
     async with UnitOfWork() as uow:
-        agent = await AgentService(uow).get_agent_by_id(agent_id)
+        agent = await AgentService(uow).get_agent_by_id(request.agent_id)
         if agent is None:
-            return {"error": f"Agent with id {agent_id} not found"}
+            return {"error": f"Agent with id {request.agent_id} not found"}
 
-    return agent.state
+    return agent.internal_state if request.internal else agent.external_state
+
+
+@sio.on("get_combined_agent_state")
+async def get_combined_agent_state(sid: str, data: Any) -> dict[str, Any]:
+    """Gets an Agent's combined state."""
+
+    try:
+        request = AgentCombinedStateRequest.model_validate(data)
+    except pydantic.ValidationError:
+        return {"error": "Validation error."}
+
+    async with UnitOfWork() as uow:
+        agent = await AgentService(uow).get_agent_by_id(request.agent_id)
+        if agent is None:
+            return {"error": f"Agent with id {request.agent_id} not found"}
+
+    return agent.combined_state

@@ -39,7 +39,8 @@ class LLMService(BaseService):
             query=str({"caller": caller.to_details(), "query": query}),
             instructions=agent.instructions or "",
             global_state=global_state,
-            agent_state=agent.state,
+            agent_internal_state=agent.internal_state,
+            agent_external_state=agent.external_state,
             action_agents={
                 action.name: action.triggered_agent.to_details()
                 for action in agent.actions
