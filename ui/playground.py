@@ -14,8 +14,11 @@ hide_streamlit_menu()
 if "edit_mode_global_state" not in st.session_state:
     st.session_state.edit_mode_global_state = False
 
-if "edit_mode_agent_state" not in st.session_state:
-    st.session_state.edit_mode_agent_state = False
+if "edit_mode_agent_internal_state" not in st.session_state:
+    st.session_state.edit_mode_agent_internal_state = False
+
+if "edit_mode_agent_external_state" not in st.session_state:
+    st.session_state.edit_mode_agent_external_state = False
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -111,9 +114,7 @@ def render_state() -> None:
             except json.JSONDecodeError:
                 st.toast("Invalid JSON format.", icon=":material/error:")
 
-        if cancel_col.button(
-            "Cancel", key="cancel_global_state", icon=":material/close:"
-        ):
+        if cancel_col.button("Cancel", key="cancel_global_state", icon=":material/close:"):
             st.session_state.edit_mode_global_state = False
             st.rerun(scope="fragment")
     else:
@@ -126,15 +127,54 @@ def render_state() -> None:
     if not agent:
         return
 
-    st.subheader(f"Agent State: {agent.name}")
+    st.subheader(f"Agent Internal State: {agent.name}")
 
-    agent_state = sockets.get_agent_state(agent.id)
-    agent_state_str = json.dumps(agent_state, indent=2)
-    if st.session_state.edit_mode_agent_state:
-        n_lines = agent_state_str.count("\n") + 1
-        agent_state_str = st.text_area(
-            "State",
-            value=agent_state_str,
+    agent_internal_state = sockets.get_agent_state(agent.id, internal=True)
+    agent_internal_state_str = json.dumps(agent_internal_state, indent=2)
+    if st.session_state.edit_mode_agent_internal_state:
+        n_lines = agent_internal_state_str.count("\n") + 1
+        agent_internal_state_str = st.text_area(
+            "Internal State",
+            value=agent_internal_state_str,
+            height=max(n_lines * 30, 68),
+            label_visibility="collapsed",
+        )
+
+        save_col, cancel_col = st.columns(2)
+
+        if save_col.button("Save", key="save_agent_internal_state", icon=":material/save:"):
+            try:
+                state = json.loads(agent_internal_state_str)
+                updated = sockets.update_agent_state(agent.id, state, internal=True)
+                if updated:
+                    st.toast(
+                        "Agent internal state updated successfully.",
+                        icon=":material/done:",
+                    )
+                    st.session_state.edit_mode_agent_internal_state = False
+                    st.rerun(scope="fragment")
+            except json.JSONDecodeError:
+                st.toast("Invalid JSON format.", icon=":material/error:")
+
+        if cancel_col.button("Cancel", key="cancel_agent_internal_state", icon=":material/close:"):
+            st.session_state.edit_mode_agent_internal_state = False
+            st.rerun(scope="fragment")
+    else:
+        st.code(agent_internal_state_str, language="json")
+
+        if st.button("Edit", key="edit_agent_internal_state", icon=":material/edit:"):
+            st.session_state.edit_mode_agent_internal_state = True
+            st.rerun(scope="fragment")
+
+    st.subheader(f"Agent External State: {agent.name}")
+
+    agent_external_state = sockets.get_agent_state(agent.id, internal=False)
+    agent_external_state_str = json.dumps(agent_external_state, indent=2)
+    if st.session_state.edit_mode_agent_external_state:
+        n_lines = agent_external_state_str.count("\n") + 1
+        agent_external_state_str = st.text_area(
+            "External State",
+            value=agent_external_state_str,
             height=max(n_lines * 30, 68),
             label_visibility="collapsed",
         )
@@ -143,28 +183,26 @@ def render_state() -> None:
 
         if save_col.button("Save", key="save_agent_state", icon=":material/save:"):
             try:
-                state = json.loads(agent_state_str)
-                updated = sockets.update_agent_state(agent.id, state)
+                state = json.loads(agent_external_state_str)
+                updated = sockets.update_agent_state(agent.id, state, internal=False)
                 if updated:
                     st.toast(
-                        "Agent state updated successfully.",
+                        "Agent external state updated successfully.",
                         icon=":material/done:",
                     )
-                    st.session_state.edit_mode_agent_state = False
+                    st.session_state.edit_mode_agent_external_state = False
                     st.rerun(scope="fragment")
             except json.JSONDecodeError:
                 st.toast("Invalid JSON format.", icon=":material/error:")
 
-        if cancel_col.button(
-            "Cancel", key="cancel_agent_state", icon=":material/close:"
-        ):
-            st.session_state.edit_mode_agent_state = False
+        if cancel_col.button("Cancel", key="cancel_agent_state", icon=":material/close:"):
+            st.session_state.edit_mode_agent_external_state = False
             st.rerun(scope="fragment")
     else:
-        st.code(agent_state_str, language="json")
+        st.code(agent_external_state_str, language="json")
 
         if st.button("Edit", key="edit_agent_state", icon=":material/edit:"):
-            st.session_state.edit_mode_agent_state = True
+            st.session_state.edit_mode_agent_external_state = True
             st.rerun(scope="fragment")
 
 

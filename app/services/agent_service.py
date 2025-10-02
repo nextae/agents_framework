@@ -1,7 +1,6 @@
 from app.errors.api import ConflictError, NotFoundError
 from app.models.agent import Agent, AgentRequest, AgentUpdateRequest
 from app.models.agent_message import AgentMessage
-from app.models.global_state import State
 
 from .base_service import BaseService
 
@@ -205,19 +204,3 @@ class AgentService(BaseService):
             agent.conversation_history.clear()
 
             await uow.agents.update(agent)
-
-    async def update_agent_state(self, agent: Agent, state: State) -> Agent:
-        """
-        Update the state of an existing agent.
-
-        Args:
-            agent (Agent): The agent to update.
-            state (State): The new state to assign to the agent.
-
-        Returns:
-            Agent: The updated agent.
-        """
-
-        async with self.unit_of_work as uow:
-            agent.state = state
-            return await uow.agents.update(agent)

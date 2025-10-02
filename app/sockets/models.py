@@ -72,6 +72,16 @@ class UpdateStateRequest(BaseModel):
 class UpdateAgentStateRequest(BaseModel):
     agent_id: int
     state: State
+    internal: bool
+
+
+class AgentStateRequest(BaseModel):
+    agent_id: int
+    internal: bool
+
+
+class AgentCombinedStateRequest(BaseModel):
+    agent_id: int
 
 
 class AuthPayload(BaseModel):

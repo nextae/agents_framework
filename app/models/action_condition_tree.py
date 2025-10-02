@@ -176,7 +176,7 @@ class ActionConditionTree:
     ) -> None:
         self.root = root
         self.global_state = global_state.state
-        self.agent_states = {agent.id: agent.state for agent in agents}
+        self.agent_states = {agent.id: agent.combined_state for agent in agents}
 
     def evaluate(self) -> bool:
         return self.root.evaluate(self.global_state, self.agent_states)

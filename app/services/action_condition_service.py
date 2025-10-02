@@ -196,7 +196,7 @@ class ActionConditionService(BaseService):
             agent_state = {}
             if condition.state_agent_id is not None:
                 agent = await AgentService(uow).get_agent_by_id(condition.state_agent_id)
-                agent_state = {agent.id: agent.state}
+                agent_state = {agent.id: agent.combined_state}
 
             try:
                 ActionConditionTreeNode.from_condition(condition).evaluate(

@@ -327,7 +327,7 @@ def add_condition_dialog(action_id: int):
             placeholder="Select an agent",
         )
 
-    state = sockets.get_global_state() if not agent else sockets.get_agent_state(agent.id)
+    state = sockets.get_global_state() if not agent else sockets.get_combined_agent_state(agent.id)
 
     state_variable = st.selectbox(
         "State variable",
@@ -400,7 +400,9 @@ def edit_condition_node(action_id: int, node: sf.StreamlitFlowNode) -> None:
         agent_id = agent.id
 
     is_agent_state = agent_id and agent_variable_toggle
-    state = sockets.get_agent_state(agent_id) if is_agent_state else sockets.get_global_state()
+    state = (
+        sockets.get_combined_agent_state(agent_id) if is_agent_state else sockets.get_global_state()
+    )
 
     try:
         index = list(state.keys()).index(condition.state_variable_name)

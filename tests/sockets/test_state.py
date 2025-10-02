@@ -6,9 +6,15 @@ import pytest
 from app.models import Agent
 from app.services.agent_service import AgentService
 from app.services.global_state_service import GlobalStateService
-from app.sockets.models import UpdateAgentStateRequest, UpdateStateRequest
+from app.sockets.models import (
+    AgentCombinedStateRequest,
+    AgentStateRequest,
+    UpdateAgentStateRequest,
+    UpdateStateRequest,
+)
 from app.sockets.state import (
     get_agent_state,
+    get_combined_agent_state,
     get_global_state,
     update_agent_state,
     update_global_state,
@@ -60,12 +66,12 @@ async def test_get_global_state__success(sio, sid, cleanup_db):
     assert response == state
 
 
-async def test_update_agent_state__success(sio, sid, insert, cleanup_db):
+async def test_update_agent_state__internal__success(sio, sid, insert, cleanup_db):
     # given
-    agent = Agent(name="Agent 1", state={"status": "idle"})
+    agent = Agent(name="Agent 1", internal_state={"status": "idle"})
     agent = await insert(agent)
 
-    request = UpdateAgentStateRequest(agent_id=agent.id, state={"status": "active"})
+    request = UpdateAgentStateRequest(agent_id=agent.id, state={"status": "active"}, internal=True)
 
     # when
     response = await update_agent_state(sid, request.model_dump())
@@ -74,12 +80,29 @@ async def test_update_agent_state__success(sio, sid, insert, cleanup_db):
     assert response == request.model_dump()
     updated_agent = await AgentService().get_agent_by_id(agent.id)
     assert updated_agent is not None
-    assert updated_agent.state == request.state
+    assert updated_agent.internal_state == request.state
+
+
+async def test_update_agent_state__external__success(sio, sid, insert, cleanup_db):
+    # given
+    agent = Agent(name="Agent 1", external_state={"status": "idle"})
+    agent = await insert(agent)
+
+    request = UpdateAgentStateRequest(agent_id=agent.id, state={"status": "active"}, internal=False)
+
+    # when
+    response = await update_agent_state(sid, request.model_dump())
+
+    # then
+    assert response == request.model_dump()
+    updated_agent = await AgentService().get_agent_by_id(agent.id)
+    assert updated_agent is not None
+    assert updated_agent.external_state == request.state
 
 
 async def test_update_agent_state__agent_not_found(sio, sid):
     # given
-    request = UpdateAgentStateRequest(agent_id=999, state={"key": "value"})
+    request = UpdateAgentStateRequest(agent_id=999, state={"key": "value"}, internal=False)
 
     # when
     response = await update_agent_state(sid, request.model_dump())
@@ -104,30 +127,87 @@ async def test_update_agent_state__validation_error(sio, sid, payload):
     assert response == {"error": "Validation error."}
 
 
-async def test_get_agent_state__success(sio, sid, insert, cleanup_db):
+async def test_get_agent_state__internal__success(sio, sid, insert, cleanup_db):
     # given
-    agent = Agent(name="Agent 1", state={"key": "value"})
+    agent = Agent(name="Agent 1", internal_state={"key": "value"})
     agent = await insert(agent)
 
+    request = AgentStateRequest(agent_id=agent.id, internal=True)
+
     # when
-    response = await get_agent_state(sid, agent.id)
+    response = await get_agent_state(sid, request.model_dump())
 
     # then
-    assert response == agent.state
+    assert response == agent.internal_state
+
+
+async def test_get_agent_state__external__success(sio, sid, insert, cleanup_db):
+    # given
+    agent = Agent(name="Agent 1", external_state={"key": "value"})
+    agent = await insert(agent)
+
+    request = AgentStateRequest(agent_id=agent.id, internal=False)
+
+    # when
+    response = await get_agent_state(sid, request.model_dump())
+
+    # then
+    assert response == agent.external_state
 
 
 async def test_get_agent_state__agent_not_found(sio, sid):
+    # given
+    request = AgentStateRequest(agent_id=999, internal=False)
+
     # when
-    response = await get_agent_state(sid, 999)
+    response = await get_agent_state(sid, request.model_dump())
 
     # then
-    assert response == {"error": "Agent with id 999 not found"}
+    assert response == {"error": f"Agent with id {request.agent_id} not found"}
 
 
 @pytest.mark.parametrize("agent_id", [None, "invalid"])
 async def test_get_agent_state__validation_error(sio, sid, agent_id):
     # when
     response = await get_agent_state(sid, agent_id)
+
+    # then
+    assert response == {"error": "Validation error."}
+
+
+async def test_get_combined_agent_state__success(sio, sid, insert, cleanup_db):
+    # given
+    agent = Agent(
+        name="Agent 1",
+        internal_state={"internal_key": "internal_value"},
+        external_state={"external_key": "external_value"},
+    )
+    agent = await insert(agent)
+
+    request = AgentCombinedStateRequest(agent_id=agent.id)
+
+    # when
+    response = await get_combined_agent_state(sid, request.model_dump())
+
+    # then
+    assert response == agent.combined_state
+
+
+async def test_get_combined_agent_state__agent_not_found(sio, sid):
+    # given
+    request = AgentCombinedStateRequest(agent_id=999)
+
+    # when
+    response = await get_combined_agent_state(sid, request.model_dump())
+
+    # then
+    assert response == {"error": f"Agent with id {request.agent_id} not found"}
+
+
+@pytest.mark.parametrize("agent_id", [None, "invalid"])
+async def test_get_combined_agent_state__validation_error(sio, sid, agent_id):
+    # when
+    response = await get_combined_agent_state(sid, agent_id)
 
     # then
     assert response == {"error": "Validation error."}

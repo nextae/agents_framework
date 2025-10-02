@@ -42,12 +42,18 @@ def update_global_state(state: dict[str, Any]) -> dict[str, Any]:
     return client.call("update_global_state", {"state": state})
 
 
-def get_agent_state(agent_id: int) -> dict[str, Any]:
-    return client.call("get_agent_state", agent_id)
+def get_agent_state(agent_id: int, internal: bool) -> dict[str, Any]:
+    return client.call("get_agent_state", {"agent_id": agent_id, "internal": internal})
 
 
-def update_agent_state(agent_id: int, state: dict[str, Any]) -> dict[str, Any]:
-    return client.call("update_agent_state", {"agent_id": agent_id, "state": state})
+def get_combined_agent_state(agent_id: int) -> dict[str, Any]:
+    return client.call("get_combined_agent_state", {"agent_id": agent_id})
+
+
+def update_agent_state(agent_id: int, state: dict[str, Any], internal: bool) -> dict[str, Any]:
+    return client.call(
+        "update_agent_state", {"agent_id": agent_id, "state": state, "internal": internal}
+    )
 
 
 def query_agent(

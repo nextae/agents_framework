@@ -383,7 +383,7 @@ async def test_query_agent__condition_evaluation_error(sio, sid, sample_player, 
         params=[],
     )
 
-    agent = Agent(name="Agent", state={"status": "active"}, actions=[action])
+    agent = Agent(name="Agent", internal_state={"status": "active"}, actions=[action])
     agent = await insert(agent)
 
     condition_root = ActionConditionOperator(
@@ -478,7 +478,7 @@ async def test_query_agent__trigger_agents__condition_evaluation_error(
         name="Agent 2",
         description="Description for agent 2",
         instructions="Instructions for agent 2",
-        state={"status": "active"},
+        internal_state={"status": "active"},
         actions=[action_2],
     )
     agent_2 = await insert(agent_2)
