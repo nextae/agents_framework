@@ -1,4 +1,5 @@
-# Agents Framework
+# Agents Platform
+Platform for creating stateful conversational AI Agents with customizable, user-defined actions.
 
 [![Python](https://img.shields.io/badge/Python-3.12-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
@@ -10,6 +11,8 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Ruff](https://img.shields.io/badge/Ruff-D7FF64?style=for-the-badge&logo=ruff&logoColor=black)](https://docs.astral.sh/ruff/)
 [![Pre-Commit](https://img.shields.io/badge/Pre--Commit-FAB040?style=for-the-badge&logo=pre-commit&logoColor=black)](https://pre-commit.com/)
+
+<img width="2493" height="1121" alt="image" src="https://github.com/user-attachments/assets/57ab398f-2324-4102-8577-9795e71fa6b1" />
 
 ---
 ### Running the Application
